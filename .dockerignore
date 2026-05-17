@@ -1,0 +1,23 @@
+# Faster image builds — exclude dev artifacts and runtime data
+.git
+.github
+.cursor
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+backend/.venv
+frontend/node_modules
+frontend/dist
+data/
+*.db
+.env
+.env.*
+!env.docker.example
+agent-transcripts
+terminals
+*.md
+!backend/README.md
+docs/
+dj-library-pipeline-spec.md

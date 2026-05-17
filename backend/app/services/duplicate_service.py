@@ -27,6 +27,7 @@ class DuplicateService:
                 DuplicateGroupResponse(
                     id=group.id,
                     fingerprint_hash=group.fingerprint_hash,
+                    preferred_track_id=group.preferred_track_id,
                     members=members,
                 )
             )
@@ -56,6 +57,9 @@ class DuplicateService:
                     duration_seconds=fp.duration_seconds,
                     format_extension=ext or None,
                     bitrate_kbps=bitrate,
+                    artist=track.artist,
+                    title=track.title,
+                    integrated_lufs=track.integrated_lufs,
                 )
             )
         return members

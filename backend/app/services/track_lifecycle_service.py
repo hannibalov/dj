@@ -6,13 +6,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.logging import get_logger
-from app.models.enums import JobStatus, JobType, TrackStatus
+from app.models.enums import JobStatus, TrackStatus
 from app.models.fingerprint import Fingerprint
 from app.models.job import Job
 from app.models.track import Track
+from app.schemas.settings import SettingsResponse
 from app.services.notify import notify_pipeline_changed
 from app.services.queue_service import ACTIVE_JOB_STATUSES, QueueService
-from app.schemas.settings import SettingsResponse
 from app.services.settings_service import SettingsService
 from app.utils.workspace_files import (
     move_into_destination,
@@ -42,9 +42,7 @@ class TrackLifecycleService:
 
         if not source.is_file():
             if library_file is None:
-                raise TrackLifecycleError(
-                    "No file in watch folder and no library copy to restore"
-                )
+                raise TrackLifecycleError("No file in watch folder and no library copy to restore")
             restore_library_file_to_watch(
                 library_file,
                 source,

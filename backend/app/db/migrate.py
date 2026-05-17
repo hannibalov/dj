@@ -50,6 +50,18 @@ def migrate_phase4_columns(engine: Engine) -> None:
     )
 
 
+def migrate_phase5_columns(engine: Engine) -> None:
+    _add_columns(
+        engine,
+        "duplicate_groups",
+        {
+            "preferred_track_id": "INTEGER",
+            "resolved_at": "DATETIME",
+        },
+    )
+
+
 def run_migrations(engine: Engine) -> None:
     migrate_tracks_analysis_columns(engine)
     migrate_phase4_columns(engine)
+    migrate_phase5_columns(engine)

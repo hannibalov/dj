@@ -77,6 +77,15 @@ class FingerprintService:
 
     def _after_fingerprint(self, track: Track, fingerprint_hash: str) -> None:
         self._db.refresh(track)
+        group = self._get_group_by_hash(fingerprint_hash)
+        if group is not None and group.preferred_track_id is not None:
+            if track.id == group.preferred_track_id:
+                QueueService(self._db).enqueue_tag(track.source_path)
+                logger.info("duplicate_manual_preferred_for_tag", source=track.source_path)
+            else:
+                self._route_to_duplicates_folder(track, fingerprint_hash)
+            return
+
         group_tracks = self._tracks_in_group(fingerprint_hash)
         preferred_ids = preferred_track_ids(group_tracks)
 
@@ -86,6 +95,11 @@ class FingerprintService:
             return
 
         self._route_to_duplicates_folder(track, fingerprint_hash)
+
+    def _get_group_by_hash(self, fingerprint_hash: str) -> DuplicateGroup | None:
+        return self._db.execute(
+            select(DuplicateGroup).where(DuplicateGroup.fingerprint_hash == fingerprint_hash)
+        ).scalar_one_or_none()
 
     def _route_to_duplicates_folder(self, track: Track, fingerprint_hash: str) -> None:
         if (

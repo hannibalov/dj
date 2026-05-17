@@ -1,6 +1,6 @@
 # Phase 5 — Duplicate resolution & review tooling
 
-**Status: not started**
+**Status: complete (5a — May 2026)**
 
 **Prerequisite:** Phase 4 complete — [PHASE4.md](./PHASE4.md) (tagging & renaming).
 
@@ -30,8 +30,8 @@ INGEST → ANALYZE → FINGERPRINT → TAG → ROUTE
 | Area | Notes |
 |------|--------|
 | `GET /duplicates` | Lists groups with 2+ members (format, bitrate, status) |
-| `POST /duplicates/resolve` | **Stub** — returns `{ "status": "not_implemented" }` |
-| `DuplicateGroupsCard.vue` | Read-only expansion panels on dashboard |
+| `POST /duplicates/resolve` | Manual keep + archive; persists `preferred_track_id` |
+| `DuplicateGroupsCard.vue` | Keep + archive dialog on dashboard |
 | `duplicate_groups` + `fingerprints` tables | Grouping by fingerprint hash |
 | `version_priority.py` | Auto-preferred track IDs per format family |
 | `archive_folder` | Path in settings; **no automated archive job yet** |
@@ -40,6 +40,37 @@ INGEST → ANALYZE → FINGERPRINT → TAG → ROUTE
 
 - Pinia stores, snackbars, WebSocket pipeline refresh — same as Phases 1–4
 - Extend duplicate card with actions and confirmation dialogs
+
+---
+
+## What was delivered (Phase 5a)
+
+### Backend
+
+| Area | Location |
+|------|----------|
+| Resolve orchestration | `backend/app/services/duplicate_resolve_service.py` |
+| API | `backend/app/api/duplicates.py` |
+| Schemas | `backend/app/schemas/duplicate.py` |
+| Migration | `duplicate_groups.preferred_track_id`, `resolved_at` |
+| Manual preference on ingest | `fingerprint_service._after_fingerprint` |
+
+### Frontend
+
+| Feature | Location |
+|---------|----------|
+| Keep + confirm dialog | `DuplicateGroupsCard.vue` |
+| API client | `frontend/src/services/duplicateService.ts` |
+| Types | `frontend/src/types/duplicate.ts` |
+
+### Tests
+
+**Backend (60):** `test_duplicate_resolve_service.py`, `test_duplicates_api.py`
+
+```bash
+make test
+make lint
+```
 
 ---
 
@@ -207,14 +238,14 @@ Auto rules in `version_priority.py` remain the **default** until the user resolv
 
 ## Exit criteria (Phase 5a)
 
-- [ ] `POST /duplicates/resolve` implemented (not stub)
-- [ ] User can keep one member of a group; others archived or left in `duplicates/`
-- [ ] Keeper can reach `ready/` with Phase 4 renamed filename after resolve
-- [ ] Manual preference persisted (re-ingest does not override without new resolve)
-- [ ] `pytest` green; new resolve tests
-- [ ] `npm test` + `make lint` green
-- [ ] Dashboard duplicate card supports Keep (+ optional Archive others)
-- [ ] Docs updated: PHASE5 complete (or 5a complete), ROADMAP
+- [x] `POST /duplicates/resolve` implemented (not stub)
+- [x] User can keep one member of a group; others archived or left in `duplicates/`
+- [x] Keeper can reach `ready/` with Phase 4 renamed filename after resolve
+- [x] Manual preference persisted (re-ingest does not override without new resolve)
+- [x] `pytest` green; new resolve tests
+- [x] `npm test` + `make lint` green
+- [x] Dashboard duplicate card supports Keep (+ optional Archive others)
+- [x] Docs updated: PHASE5 complete (or 5a complete), ROADMAP
 
 ---
 

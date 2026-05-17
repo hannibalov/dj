@@ -1,72 +1,168 @@
 # DJ Library Pipeline
 
-Self-hosted, fire-and-forget DJ library ingestion and organization for Raspberry Pi 4 and Docker. Watches a synced music folder (e.g. Nextcloud), queues work safely, copies files into a processing workspace (never in place), analyzes loudness, fingerprints duplicates, and routes tracks into `ready/`, `review/`, or `duplicates/` — with tagging and renaming planned in Phase 4.
+Self-hosted DJ library ingestion for **Raspberry Pi 4** and Docker. Watches a synced folder (e.g. Nextcloud), queues work safely, copies into a processing workspace (never in place), analyzes loudness, fingerprints duplicates, tags/renames via AcoustID, and routes tracks to `ready/`, `review/`, `duplicates/`, or `archive/`.
 
 | Document | Purpose |
 |----------|---------|
 | [dj-library-pipeline-spec.md](./dj-library-pipeline-spec.md) | Full product specification |
 | [docs/ROADMAP.md](./docs/ROADMAP.md) | Phased roadmap |
-| [docs/PHASE1.md](./docs/PHASE1.md) | Phase 1 (ingest) — **complete** |
-| [docs/PHASE2.md](./docs/PHASE2.md) | Phase 2 (analysis & routing) — **complete** |
-| [docs/PHASE3.md](./docs/PHASE3.md) | Phase 3 (fingerprints & duplicates) — **complete** |
-| [docs/PHASE4.md](./docs/PHASE4.md) | Phase 4 (tagging & **renaming**) — **start here** |
+| [docs/PHASE6.md](./docs/PHASE6.md) | **Next:** Docker on Pi — deployment plan |
+| [docs/PHASE1.md](./docs/PHASE1.md) – [PHASE5.md](./docs/PHASE5.md) | Completed phase notes |
 
 ## Stack
 
 | Layer | Technology |
 |-------|------------|
-| Backend | Python 3.11+, FastAPI, SQLAlchemy, SQLite, watchdog, structlog, httpx |
-| Frontend | Vue 3, Vite, TypeScript, Pinia, Vuetify, Vitest |
-| Analysis | ffmpeg (required), Essentia (optional), Chromaprint/fpcalc (fingerprints), Picard (Phase 4) |
-| Runtime | Docker Compose |
+| Backend | Python 3.11+, FastAPI, SQLAlchemy, SQLite, watchdog, structlog |
+| Frontend | Vue 3, Vite, TypeScript, Pinia, Vuetify |
+| Analysis | ffmpeg, Chromaprint (`fpcalc`), pyacoustid; Essentia optional (not in Docker yet) |
+| Runtime | **Docker Compose** (recommended for Pi) |
 
-## Repository layout
+## Current pipeline (Phases 1–5)
 
 ```text
-backend/app/analysis/    Phase 2 — loudness, BPM/key, Camelot
-backend/app/router/      Phase 2 — review vs ready rules
-backend/app/fingerprint/ Phase 3 — Chromaprint, duplicate detection
-backend/app/metadata/    Phase 4 placeholder
-frontend/                Vue 3 + TypeScript UI
-data/                    Runtime folders + SQLite (gitignored)
-docs/                    Phase plans (PHASE1–4, ROADMAP)
+watch → INGEST → ANALYZE → FINGERPRINT → TAG → ROUTE
+                              ↓
+                    duplicates/<hash>/   (non-preferred)
+                    ready/ or review/    (preferred, after tag + loudness)
 ```
 
+Manual duplicate resolution: dashboard **Keep** → `POST /duplicates/resolve` → archive others, re-tag keeper.
+
+---
+
+## Docker (Raspberry Pi / server)
+
+**Recommended for 24/7 use on a Pi.** Images include ffmpeg and fpcalc; no host Python required.
+
+### Requirements
+
+| Item | Notes |
+|------|--------|
+| OS | Raspberry Pi OS **64-bit** (or any Linux `arm64`/`amd64` host) |
+| Docker | Engine 24+ and Compose v2.24+ (for optional registry override file) |
+| RAM | 2 GB minimum; 4 GB+ comfortable with worker analyzing large files |
+| Disk | Persistent volume for `data/` (SQLite + audio folders) |
+
+### 1. Prepare on the Pi
+
+```bash
+git clone <your-repo-url> dj && cd dj
+
+cp env.docker.example .env
+# Edit .env — set DJ_ACOUSTID_API_KEY (https://acoustid.org/new-application)
+
+mkdir -p data/{watch,incoming,processing,ready,review,duplicates,archive,failed,logs,rekordbox}
+```
+
+**Optional — point watch at a sync folder** (e.g. Nextcloud):
+
+```yaml
+# In docker-compose.yml, under api/worker/watcher volumes, add:
+#   - /home/pi/nextcloud/Music/Dropbox:/data/watch
+```
+
+Or symlink: `ln -s /path/to/sync/folder data/watch`
+
+### 2. Build and run
+
+```bash
+docker compose up -d --build
+```
+
+| Service | Role |
+|---------|------|
+| `api` | FastAPI on port 8000 (internal + host) |
+| `worker` | Job queue processor |
+| `watcher` | Watch folder → ingest jobs |
+| `scheduler` | Heartbeat / future retries |
+| `frontend` | nginx UI on port **5173** |
+| `db-init` | One-shot SQLite init (runs once) |
+
+Open **http://\<pi-ip\>:5173** — UI proxies `/api` and `/ws` to the API container.
+
+### 3. Try it
+
+1. Copy audio into `data/watch/` (or your mounted sync path).
+2. Wait ~10s for stability, then watch the dashboard (live WebSocket updates).
+3. Preferred copies end in `data/ready/` as `Title - Artist (Mix).ext` after tagging.
+4. Duplicates appear under **Duplicate groups** — use **Keep** to override auto-preference.
+
+### 4. Logs and lifecycle
+
+```bash
+docker compose ps
+docker compose logs -f worker
+docker compose restart worker watcher api
+docker compose down          # stop (data/ persists)
+docker compose up -d --build # upgrade after git pull
+```
+
+### 5. Publish images (build on Mac/CI, run on Pi)
+
+On a machine with [Docker Buildx](https://docs.docker.com/build/building/multi-platform/):
+
+```bash
+export REGISTRY=ghcr.io/youruser/dj-pipeline   # adjust
+
+docker buildx build --platform linux/arm64 -f docker/Dockerfile.backend \
+  -t ${REGISTRY}-backend:latest --push .
+
+docker buildx build --platform linux/arm64 -f docker/Dockerfile.frontend \
+  -t ${REGISTRY}-frontend:latest --push .
+```
+
+On the **Pi** (pull instead of build):
+
+```bash
+export DJ_BACKEND_IMAGE=ghcr.io/youruser/dj-pipeline-backend:latest
+export DJ_FRONTEND_IMAGE=ghcr.io/youruser/dj-pipeline-frontend:latest
+docker compose -f docker-compose.pull.yml pull
+docker compose -f docker-compose.pull.yml up -d
+```
+
+Native build on the Pi (`docker compose up -d --build`) avoids a registry and is fine for personal use.
+
+### Docker vs local paths
+
+| Setting | In container | On host (default compose) |
+|---------|----------------|---------------------------|
+| Database | `/data/dj_library.db` | `./data/dj_library.db` |
+| Watch | `/data/watch` | `./data/watch` |
+| Ready | `/data/ready` | `./data/ready` |
+
+`docker-compose.yml` sets `DJ_*_FOLDER=/data/...`; the bind mount `./data:/data` maps them to your host tree.
+
+---
+
 ## Quick start (local development)
+
+For hacking on the codebase without Docker.
 
 ### 1. Install
 
 ```bash
-chmod +x install.sh
-./install.sh
+chmod +x install.sh && ./install.sh
+cd /path/to/dj && set -a && source .env && set +a
 ```
 
-Creates `data/*`, Python venv, `data/dj_library.db`, npm deps, and `.env` with paths under `./data/`.
+Creates `data/*`, Python venv, SQLite, npm deps. **Does not** install ffmpeg/fpcalc — see below.
 
-**Does not install** system audio tools — see [System dependencies](#system-dependencies) below.
-
-```bash
-cd /path/to/dj
-set -a && source .env && set +a
-```
-
-### System dependencies
-
-| Tool | Used for | Local dev (`./install.sh`) | Docker (`docker/Dockerfile.backend`) |
-|------|----------|----------------------------|--------------------------------------|
-| **ffmpeg** | Loudness analysis (required) | Install yourself | Preinstalled |
-| **fpcalc** (Chromaprint) | Fingerprints & duplicates (required) | Install yourself | Preinstalled (`libchromaprint-tools`) |
-| **Essentia** | BPM / key / energy (optional) | Optional | Not bundled on ARM/Pi yet |
+### System dependencies (local only)
 
 ```bash
 # macOS
 brew install ffmpeg chromaprint
 
-# Debian/Ubuntu
+# Debian/Ubuntu / Raspberry Pi OS (dev on Pi without Docker)
 sudo apt install ffmpeg libchromaprint-tools
 ```
 
-Without `fpcalc`, `FINGERPRINT` jobs fail; without `ffmpeg`, `ANALYZE` fails.
+| Tool | Required for |
+|------|----------------|
+| ffmpeg | Loudness analysis |
+| fpcalc | Fingerprints & duplicates |
+| Essentia | BPM/key (optional; not in Docker image yet) |
 
 ### 2. Run (four terminals)
 
@@ -77,29 +173,7 @@ Without `fpcalc`, `FINGERPRINT` jobs fail; without `ffmpeg`, `ANALYZE` fails.
 | Watcher | `python -m app.workers.watcher` |
 | Frontend | `cd frontend && npm run dev` |
 
-Open http://localhost:5173 — REST via `/api`, WebSocket at `/ws`.
-
-### 3. Try it
-
-1. Copy audio to `data/watch/`.
-2. Wait for stability (~10s) — worker runs **ingest → analyze → fingerprint → route**.
-3. Dashboard updates live: **Loudness** (LUFS + peak), **Duplicate groups** (when fingerprints match).
-4. Preferred copies land in `data/ready/` or `data/review/`; extra duplicates in `data/duplicates/<hash>/`. **Filenames stay as uploaded** until Phase 4 tagging/renaming.
-
-For tracks already ingested before analysis: click **Analyze backlog** on the dashboard (enqueues `ANALYZE` only; fingerprint and route follow automatically).
-
-See [PHASE2.md](./docs/PHASE2.md) (analysis) and [PHASE3.md](./docs/PHASE3.md) (fingerprints).
-
----
-
-## Dashboard (current UI)
-
-- **Top action bar:** Rescan watch folder · Analyze backlog
-- **Snackbar feedback:** success/error messages, auto-dismiss after 10s (bottom-right)
-- **Tracks table:** status filter; BPM, key, energy, loudness (chip + LUFS/peak), library copy path
-- **Duplicate groups:** fingerprint hash, format/bitrate per member, status chips
-- **Jobs table:** pending/running/completed ingest, analyze, fingerprint, route jobs
-- **Queue & worker cards:** counts and last WebSocket event
+Open http://localhost:5173
 
 ---
 
@@ -107,82 +181,78 @@ See [PHASE2.md](./docs/PHASE2.md) (analysis) and [PHASE3.md](./docs/PHASE3.md) (
 
 | Source | Role |
 |--------|------|
-| `.env` | Defaults (`./data/...` locally) |
-| Settings UI | SQLite overrides (win over `.env`) |
-| docker-compose | `/data/...` in containers |
+| `.env` | Secrets and overrides (`env.docker.example` for Docker) |
+| Settings UI | SQLite folder paths (override `.env`; restart watcher if `watch_folder` changes) |
+| `docker-compose.yml` | `/data/...` paths and service limits |
 
-Restart **watcher** after changing `watch_folder` in the UI.
+`DJ_ACOUSTID_API_KEY` — tagging without it falls back to embedded tags / filename parsing.
 
 `DJ_REVIEW_LUFS_THRESHOLD` / `DJ_REVIEW_TRUE_PEAK_DB` — loudness routing (defaults `-18` LUFS, `-0.1` dBTP).
 
 ---
 
-## API
+## Dashboard
+
+- **Rescan watch** · **Analyze backlog**
+- **Tracks:** status, BPM, key, loudness, artist/title, metadata review chip
+- **Duplicate groups:** format, LUFS, **Keep** + archive others
+- **Jobs** and queue stats; WebSocket live updates
+
+---
+
+## API (summary)
 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | Health check |
-| GET/PUT | `/settings` | Folder paths + stability |
-| GET | `/pipeline/status` | Queue + tracks + worker snapshot |
-| GET | `/queue` | Queue summary |
-| POST | `/queue/rescan` | Scan watch folder → `INGEST` jobs |
-| POST | `/queue/analyze-backlog` | `ANALYZE` for ingested tracks without LUFS |
-| GET | `/tracks`, `/tracks/{id}` | Track list/detail |
-| GET | `/duplicates` | Duplicate groups (2+ tracks, format/bitrate per member) |
-| POST | `/duplicates/resolve` | Stub — manual resolution later |
-| GET | `/logs` | Stub |
-| WS | `/ws` | Pipeline snapshot push |
-| POST | `/internal/pipeline-notify` | Worker → UI refresh |
-
----
-
-## Resetting local state
-
-```bash
-# Stop worker, watcher, API first
-rm -f data/dj_library.db
-rm -f data/processing/* data/ready/* data/review/* data/duplicates/*/*
-cd backend && source .venv/bin/activate && set -a && source ../.env && set +a
-python -m app.db.init_db
-```
-
-Deleting files without resetting the DB leaves stale `tracks`/`jobs` rows.
+| GET/PUT | `/settings` | Folders + tagging thresholds |
+| GET | `/pipeline/status` | Full snapshot |
+| POST | `/queue/rescan` | Scan watch → ingest |
+| POST | `/queue/analyze-backlog` | Analyze ingested tracks without LUFS |
+| GET | `/duplicates` | Duplicate groups |
+| POST | `/duplicates/resolve` | Keep one copy; archive others |
+| POST | `/tracks/{id}/reset` | Reset track pipeline |
+| POST | `/tracks/{id}/confirm-review` | Move review → ready |
+| WS | `/ws` | Pipeline push (proxied at `/ws` in Docker UI) |
 
 ---
 
 ## Tests & lint
 
 ```bash
-make test      # 28 backend + 8 frontend tests
+make test      # 60 backend + 9 frontend
 make lint
-make lint-fix
 ```
 
 ---
 
-## Current pipeline (Phases 1–3)
+## Resetting state
 
-```text
-watch → INGEST → ANALYZE → FINGERPRINT → ROUTE
-                              ↓
-                    duplicates/<hash>/  (non-preferred)
-                    ready/ or review/   (preferred, loudness rules)
+```bash
+# Stop all processes / docker compose down first
+rm -f data/dj_library.db data/processing/* data/ready/* data/review/* data/duplicates/*/*
+# Docker: db-init runs on next compose up, or:
+docker compose run --rm db-init
 ```
 
-## What’s next (Phase 4)
+---
 
-MusicBrainz / Picard tagging, **file renaming** (`Title - Artist (Mix).ext`), final metadata in `ready/`. See [docs/PHASE4.md](./docs/PHASE4.md).
+## What’s next
 
-**Not yet:** manual duplicate resolution UI, `POST /duplicates/resolve`, Picard in Docker image.
+| Priority | Doc | Topic |
+|----------|-----|--------|
+| **Now** | [PHASE6.md](./docs/PHASE6.md) | Docker on Pi (6a) |
+| Later | PHASE6 backlog | Duplicate compare + waveforms (5b), tag backlog + retries (5c), settings UI (5d) |
+| Later | — | Essentia on ARM, `GET /logs`, metrics dashboard |
 
 ---
 
 ## Core principles
 
 1. **Never process in place** — watch → processing → library folders.
-2. **Queue-based** — watcher enqueues; workers process jobs.
-3. **TDD** — tests before new modules.
-4. **Docker-first** for deployment.
+2. **Queue-based** — watcher enqueues; workers process.
+3. **Docker-first** for deployment on Pi.
+4. **TDD** — tests before new modules.
 
 ## License
 
