@@ -71,8 +71,9 @@ Items deferred while shipping core pipeline features. **Not part of Phase 6a** u
 | Images | `docker/Dockerfile.frontend` (nginx static + API/WS proxy) |
 | Compose | `docker-compose.yml` — api, worker, watcher, scheduler, frontend, db-init |
 | Networking | nginx proxies `/api` and `/ws` to API container |
-| Docs | README — build, run, Pi mount paths, registry push |
-| Docs | This file + [ROADMAP.md](./ROADMAP.md) |
+| Deploy bundle | `deploy/` — compose + `.env.example` + `install-on-pi.sh` (curl, no clone) |
+| CI | `.github/workflows/docker-publish.yml` → GHCR multi-arch |
+| Docs | README + [deploy/README.md](../deploy/README.md) |
 
 ### Host requirements (Pi)
 
@@ -138,39 +139,31 @@ Tune on Pi 4 if OOM — worker is the heaviest (ffmpeg analyze).
 
 ## Operational notes
 
-### First run on Pi
+### Pi deploy (no git clone)
+
+See **[deploy/README.md](../deploy/README.md)**.
 
 ```bash
-git clone <repo> && cd dj
-cp env.docker.example .env
-# Edit .env — at minimum DJ_ACOUSTID_API_KEY
-mkdir -p data/{watch,incoming,processing,ready,review,duplicates,archive,failed,logs,rekordbox}
-docker compose up -d --build
+curl -fsSL https://raw.githubusercontent.com/hannibalov/dj/main/deploy/install-on-pi.sh | sh
+cd ~/dj-pipeline && nano .env
+docker compose pull && docker compose up -d
 ```
 
-Open `http://<pi-ip>:5173`. Drop audio into `data/watch/` (or your mounted sync path).
+Only `deploy/docker-compose.yml`, `.env`, and `data/` live on the Pi.
 
-### Publish images (optional)
+### Publish images
 
-Build and push from a machine with `buildx`:
+- **CI:** `.github/workflows/docker-publish.yml` → GHCR `ghcr.io/hannibalov/dj-library-pipeline-{backend,frontend}:latest`
+- **Local:** `docker buildx` with `--platform linux/arm64 --push` (documented in deploy README)
+
+Set GHCR packages to **public** so the Pi can pull without `docker login`.
+
+### Upgrade on Pi
 
 ```bash
-docker buildx build --platform linux/arm64 -f docker/Dockerfile.backend \
-  -t YOUR_REGISTRY/dj-pipeline-backend:latest --push .
-docker buildx build --platform linux/arm64 -f docker/Dockerfile.frontend \
-  -t YOUR_REGISTRY/dj-pipeline-frontend:latest --push .
+cd ~/dj-pipeline
+docker compose pull && docker compose up -d
 ```
-
-On the Pi, use `docker-compose.pull.yml` with `DJ_BACKEND_IMAGE` / `DJ_FRONTEND_IMAGE` — see README.
-
-### Upgrade
-
-```bash
-docker compose pull   # if using registry images
-docker compose up -d --build
-```
-
-SQLite and `data/` persist on the host volume.
 
 ---
 

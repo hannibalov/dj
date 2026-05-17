@@ -31,107 +31,36 @@ Manual duplicate resolution: dashboard **Keep** → `POST /duplicates/resolve` �
 
 ---
 
-## Docker (Raspberry Pi / server)
+## Raspberry Pi — Docker Hub
 
-**Recommended for 24/7 use on a Pi.** Images include ffmpeg and fpcalc; no host Python required.
+**GitHub hosts the code; Docker Hub hosts the images.** Pushing to GitHub does not publish Docker images — you build and push **once from your Mac**, then the Pi only pulls.
 
-### Requirements
-
-| Item | Notes |
-|------|--------|
-| OS | Raspberry Pi OS **64-bit** (or any Linux `arm64`/`amd64` host) |
-| Docker | Engine 24+ and Compose v2.24+ (for optional registry override file) |
-| RAM | 2 GB minimum; 4 GB+ comfortable with worker analyzing large files |
-| Disk | Persistent volume for `data/` (SQLite + audio folders) |
-
-### 1. Prepare on the Pi
+### On your Mac (publish)
 
 ```bash
-git clone <your-repo-url> dj && cd dj
+cd /path/to/dj
+docker login
+./deploy/publish-dockerhub.sh
+```
 
-cp env.docker.example .env
-# Edit .env — set DJ_ACOUSTID_API_KEY (https://acoustid.org/new-application)
+Images: `hannibalov/dj-pipeline-backend:latest` and `hannibalov/dj-pipeline-frontend:latest`  
+(override with `DOCKER_USER=yourhubname` if needed)
 
+### On the Pi (run)
+
+```bash
+mkdir -p ~/dj-pipeline && cd ~/dj-pipeline
+curl -fsSLO https://raw.githubusercontent.com/hannibalov/dj/main/deploy/docker-compose.yml
+printf 'DJ_ENV=production\nDJ_ACOUSTID_API_KEY=your_key\n' > .env
 mkdir -p data/{watch,incoming,processing,ready,review,duplicates,archive,failed,logs,rekordbox}
+docker compose pull && docker compose up -d
 ```
 
-**Optional — point watch at a sync folder** (e.g. Nextcloud):
+Open **http://\<pi-ip\>:5173** — full guide: [deploy/README.md](./deploy/README.md)
 
-```yaml
-# In docker-compose.yml, under api/worker/watcher volumes, add:
-#   - /home/pi/nextcloud/Music/Dropbox:/data/watch
-```
+### Developers: build from source
 
-Or symlink: `ln -s /path/to/sync/folder data/watch`
-
-### 2. Build and run
-
-```bash
-docker compose up -d --build
-```
-
-| Service | Role |
-|---------|------|
-| `api` | FastAPI on port 8000 (internal + host) |
-| `worker` | Job queue processor |
-| `watcher` | Watch folder → ingest jobs |
-| `scheduler` | Heartbeat / future retries |
-| `frontend` | nginx UI on port **5173** |
-| `db-init` | One-shot SQLite init (runs once) |
-
-Open **http://\<pi-ip\>:5173** — UI proxies `/api` and `/ws` to the API container.
-
-### 3. Try it
-
-1. Copy audio into `data/watch/` (or your mounted sync path).
-2. Wait ~10s for stability, then watch the dashboard (live WebSocket updates).
-3. Preferred copies end in `data/ready/` as `Title - Artist (Mix).ext` after tagging.
-4. Duplicates appear under **Duplicate groups** — use **Keep** to override auto-preference.
-
-### 4. Logs and lifecycle
-
-```bash
-docker compose ps
-docker compose logs -f worker
-docker compose restart worker watcher api
-docker compose down          # stop (data/ persists)
-docker compose up -d --build # upgrade after git pull
-```
-
-### 5. Publish images (build on Mac/CI, run on Pi)
-
-On a machine with [Docker Buildx](https://docs.docker.com/build/building/multi-platform/):
-
-```bash
-export REGISTRY=ghcr.io/youruser/dj-pipeline   # adjust
-
-docker buildx build --platform linux/arm64 -f docker/Dockerfile.backend \
-  -t ${REGISTRY}-backend:latest --push .
-
-docker buildx build --platform linux/arm64 -f docker/Dockerfile.frontend \
-  -t ${REGISTRY}-frontend:latest --push .
-```
-
-On the **Pi** (pull instead of build):
-
-```bash
-export DJ_BACKEND_IMAGE=ghcr.io/youruser/dj-pipeline-backend:latest
-export DJ_FRONTEND_IMAGE=ghcr.io/youruser/dj-pipeline-frontend:latest
-docker compose -f docker-compose.pull.yml pull
-docker compose -f docker-compose.pull.yml up -d
-```
-
-Native build on the Pi (`docker compose up -d --build`) avoids a registry and is fine for personal use.
-
-### Docker vs local paths
-
-| Setting | In container | On host (default compose) |
-|---------|----------------|---------------------------|
-| Database | `/data/dj_library.db` | `./data/dj_library.db` |
-| Watch | `/data/watch` | `./data/watch` |
-| Ready | `/data/ready` | `./data/ready` |
-
-`docker-compose.yml` sets `DJ_*_FOLDER=/data/...`; the bind mount `./data:/data` maps them to your host tree.
+Clone the repo and use root `docker compose up -d --build`, or see [Quick start (local development)](#quick-start-local-development) below.
 
 ---
 

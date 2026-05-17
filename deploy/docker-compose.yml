@@ -1,5 +1,5 @@
-# Deprecated: use deploy/docker-compose.yml on the Pi (no repo clone).
-# See deploy/README.md and https://github.com/hannibalov/dj/tree/main/deploy
+# Pull-only stack — no git clone, no local build on the Pi.
+# Defaults: Docker Hub (publish from Mac with deploy/publish-dockerhub.sh).
 
 x-docker-env: &docker-env
   DJ_API_INTERNAL_URL: http://api:8000
@@ -16,7 +16,7 @@ x-docker-env: &docker-env
   DJ_REKORDBOX_EXPORT_FOLDER: /data/rekordbox
 
 x-backend: &backend
-  image: ${DJ_BACKEND_IMAGE:?Set DJ_BACKEND_IMAGE e.g. ghcr.io/you/dj-pipeline-backend:latest}
+  image: ${DJ_BACKEND_IMAGE:-hannibalov/dj-pipeline-backend:latest}
   env_file: .env
   environment: *docker-env
   volumes:
@@ -32,7 +32,8 @@ services:
     cpus: "1.0"
     mem_limit: 512m
     depends_on:
-      - db-init
+      db-init:
+        condition: service_completed_successfully
 
   worker:
     <<: *backend
@@ -40,7 +41,8 @@ services:
     cpus: "1.0"
     mem_limit: 1g
     depends_on:
-      - api
+      api:
+        condition: service_started
 
   watcher:
     <<: *backend
@@ -48,7 +50,8 @@ services:
     cpus: "0.5"
     mem_limit: 256m
     depends_on:
-      - api
+      api:
+        condition: service_started
 
   scheduler:
     <<: *backend
@@ -56,14 +59,16 @@ services:
     cpus: "0.25"
     mem_limit: 128m
     depends_on:
-      - api
+      api:
+        condition: service_started
 
   frontend:
-    image: ${DJ_FRONTEND_IMAGE:?Set DJ_FRONTEND_IMAGE e.g. ghcr.io/you/dj-pipeline-frontend:latest}
+    image: ${DJ_FRONTEND_IMAGE:-hannibalov/dj-pipeline-frontend:latest}
     ports:
       - "5173:80"
     depends_on:
-      - api
+      api:
+        condition: service_started
     restart: unless-stopped
 
   db-init:
