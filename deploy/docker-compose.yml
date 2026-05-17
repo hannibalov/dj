@@ -16,7 +16,7 @@ x-docker-env: &docker-env
   DJ_REKORDBOX_EXPORT_FOLDER: /data/rekordbox
 
 x-backend: &backend
-  image: ${DJ_BACKEND_IMAGE:-hannibalov/dj-pipeline-backend:latest}
+  image: ${DOCKER_USER:?Set DOCKER_USER in .env to your Docker Hub ID}/dj-pipeline-backend:latest
   env_file: .env
   environment: *docker-env
   volumes:
@@ -63,7 +63,7 @@ services:
         condition: service_started
 
   frontend:
-    image: ${DJ_FRONTEND_IMAGE:-hannibalov/dj-pipeline-frontend:latest}
+    image: ${DOCKER_USER:?Set DOCKER_USER in .env}/dj-pipeline-frontend:latest
     ports:
       - "5173:80"
     depends_on:

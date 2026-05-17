@@ -16,7 +16,7 @@ curl -fsSL "$BASE/.env.example" -o .env.example
 
 if [ ! -f .env ]; then
   cp .env.example .env
-  echo "Created .env — edit DJ_ACOUSTID_API_KEY before starting."
+  echo "Created .env — set DOCKER_USER and DJ_ACOUSTID_API_KEY before starting."
 fi
 
 mkdir -p data/watch data/incoming data/processing data/ready data/review \

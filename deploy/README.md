@@ -17,17 +17,19 @@ Clone or open the repo on your Mac (you already have it for development):
 
 ```bash
 cd /path/to/dj
-docker login    # Docker Hub username + password / access token
+docker login -u YOUR_DOCKERHUB_USERNAME   # use your Hub ID, not GitHub username
 chmod +x deploy/publish-dockerhub.sh
-./deploy/publish-dockerhub.sh
+DOCKER_USER=YOUR_DOCKERHUB_USERNAME ./deploy/publish-dockerhub.sh
 ```
 
-Default image names (change `DOCKER_USER` if your Hub username is not `hannibalov`):
+Image names use **your Docker Hub ID** (see https://hub.docker.com/settings/general):
 
-| Image | Pull on Pi |
-|-------|------------|
-| `hannibalov/dj-pipeline-backend:latest` | `docker pull hannibalov/dj-pipeline-backend:latest` |
-| `hannibalov/dj-pipeline-frontend:latest` | `docker pull hannibalov/dj-pipeline-frontend:latest` |
+| Image | Example |
+|-------|---------|
+| `YOUR_USER/dj-pipeline-backend:latest` | `docker pull YOUR_USER/dj-pipeline-backend:latest` |
+| `YOUR_USER/dj-pipeline-frontend:latest` | `docker pull YOUR_USER/dj-pipeline-frontend:latest` |
+
+**Push denied?** The script was probably pushing to the wrong namespace (e.g. `hannibalov/...` while you are logged in as someone else). Always set `DOCKER_USER` to the account you used for `docker login`.
 
 **Apple Silicon Mac:** builds `linux/arm64` natively for the Pi.
 
@@ -58,7 +60,7 @@ No git clone. Only Docker + compose file + `.env`.
 mkdir -p ~/dj-pipeline && cd ~/dj-pipeline
 
 curl -fsSLO https://raw.githubusercontent.com/hannibalov/dj/main/deploy/docker-compose.yml
-printf 'DJ_ENV=production\nDJ_ACOUSTID_API_KEY=your_key\n' > .env
+printf 'DOCKER_USER=youruser\nDJ_ENV=production\nDJ_ACOUSTID_API_KEY=your_key\n' > .env
 
 mkdir -p data/{watch,incoming,processing,ready,review,duplicates,archive,failed,logs,rekordbox}
 
@@ -68,11 +70,11 @@ docker compose up -d
 
 Open **http://\<pi-ip\>:5173**
 
-If your Docker Hub username is not `hannibalov`, add to `.env`:
+Your `.env` must include `DOCKER_USER` (your Docker Hub ID — same as on the Mac):
 
 ```env
-DJ_BACKEND_IMAGE=youruser/dj-pipeline-backend:latest
-DJ_FRONTEND_IMAGE=youruser/dj-pipeline-frontend:latest
+DOCKER_USER=youruser
+DJ_ACOUSTID_API_KEY=your_key
 ```
 
 ### Mount a sync folder as watch

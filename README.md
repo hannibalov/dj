@@ -39,19 +39,18 @@ Manual duplicate resolution: dashboard **Keep** â†’ `POST /duplicates/resolve` â
 
 ```bash
 cd /path/to/dj
-docker login
-./deploy/publish-dockerhub.sh
+docker login -u YOUR_DOCKERHUB_USERNAME
+DOCKER_USER=YOUR_DOCKERHUB_USERNAME ./deploy/publish-dockerhub.sh
 ```
 
-Images: `hannibalov/dj-pipeline-backend:latest` and `hannibalov/dj-pipeline-frontend:latest`  
-(override with `DOCKER_USER=yourhubname` if needed)
+Images: `YOUR_DOCKERHUB_USERNAME/dj-pipeline-backend:latest` and `...-frontend:latest`
 
 ### On the Pi (run)
 
 ```bash
 mkdir -p ~/dj-pipeline && cd ~/dj-pipeline
 curl -fsSLO https://raw.githubusercontent.com/hannibalov/dj/main/deploy/docker-compose.yml
-printf 'DJ_ENV=production\nDJ_ACOUSTID_API_KEY=your_key\n' > .env
+printf 'DOCKER_USER=youruser\nDJ_ENV=production\nDJ_ACOUSTID_API_KEY=your_key\n' > .env
 mkdir -p data/{watch,incoming,processing,ready,review,duplicates,archive,failed,logs,rekordbox}
 docker compose pull && docker compose up -d
 ```

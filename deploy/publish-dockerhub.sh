@@ -1,18 +1,25 @@
 #!/usr/bin/env bash
 # Build on your Mac and push to Docker Hub (run from repo root).
 #
-#   docker login
-#   ./deploy/publish-dockerhub.sh
+#   docker login -u YOUR_DOCKERHUB_USERNAME
+#   DOCKER_USER=YOUR_DOCKERHUB_USERNAME ./deploy/publish-dockerhub.sh
 #
-# Override Docker Hub username if needed:
-#   DOCKER_USER=myuser ./deploy/publish-dockerhub.sh
+# Image tags must match the account you logged into (not the GitHub username).
 #
 # Pi needs arm64; Intel Macs use buildx (installed with Docker Desktop).
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DOCKER_USER="${DOCKER_USER:-hannibalov}"
+
+if [ -z "${DOCKER_USER:-}" ]; then
+  echo "Set your Docker Hub username (same account as 'docker login'):"
+  echo "  DOCKER_USER=yourhubname ./deploy/publish-dockerhub.sh"
+  echo ""
+  echo "Check https://hub.docker.com/settings/general — 'Docker ID' is your username."
+  exit 1
+fi
+
 TAG="${TAG:-latest}"
 PLATFORMS="${PLATFORMS:-linux/arm64}"
 
@@ -23,6 +30,11 @@ cd "$ROOT"
 
 if ! docker info >/dev/null 2>&1; then
   echo "Docker is not running. Start Docker Desktop and try again."
+  exit 1
+fi
+
+if ! grep -q 'index.docker.io\|docker.io' "${HOME}/.docker/config.json" 2>/dev/null; then
+  echo "Not logged into Docker Hub. Run: docker login -u ${DOCKER_USER}"
   exit 1
 fi
 
@@ -57,6 +69,5 @@ echo "Done. On the Pi:"
 echo "  docker pull ${BACKEND}"
 echo "  docker pull ${FRONTEND}"
 echo ""
-echo "Set in ~/dj-pipeline/.env if your Docker Hub user is not ${DOCKER_USER}:"
-echo "  DJ_BACKEND_IMAGE=${BACKEND}"
-echo "  DJ_FRONTEND_IMAGE=${FRONTEND}"
+echo "On the Pi, add to ~/dj-pipeline/.env:"
+echo "  DOCKER_USER=${DOCKER_USER}"
