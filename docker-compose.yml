@@ -1,0 +1,97 @@
+x-docker-env: &docker-env
+  DJ_API_INTERNAL_URL: http://api:8000
+  DJ_DATABASE_URL: sqlite:////data/dj_library.db
+  DJ_WATCH_FOLDER: /data/watch
+  DJ_INCOMING_FOLDER: /data/incoming
+  DJ_PROCESSING_FOLDER: /data/processing
+  DJ_READY_FOLDER: /data/ready
+  DJ_REVIEW_FOLDER: /data/review
+  DJ_DUPLICATES_FOLDER: /data/duplicates
+  DJ_ARCHIVE_FOLDER: /data/archive
+  DJ_FAILED_FOLDER: /data/failed
+  DJ_LOGS_FOLDER: /data/logs
+  DJ_REKORDBOX_EXPORT_FOLDER: /data/rekordbox
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    env_file: .env
+    environment: *docker-env
+    volumes:
+      - ./data:/data
+    ports:
+      - "8000:8000"
+    cpus: "1.0"
+    mem_limit: 512m
+    depends_on:
+      - db-init
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    command: python -m app.workers.main
+    env_file: .env
+    environment: *docker-env
+    volumes:
+      - ./data:/data
+    cpus: "1.0"
+    mem_limit: 1g
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  watcher:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    command: python -m app.workers.watcher
+    env_file: .env
+    environment: *docker-env
+    volumes:
+      - ./data:/data
+    cpus: "0.5"
+    mem_limit: 256m
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    command: python -m app.workers.scheduler
+    env_file: .env
+    environment: *docker-env
+    volumes:
+      - ./data:/data
+    cpus: "0.25"
+    mem_limit: 128m
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  db-init:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    command: python -m app.db.init_db
+    env_file: .env
+    environment: *docker-env
+    volumes:
+      - ./data:/data
+    restart: "no"

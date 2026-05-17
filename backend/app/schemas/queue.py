@@ -1,0 +1,38 @@
+from datetime import datetime
+
+from pydantic import BaseModel
+
+from app.models.enums import JobStatus, JobType
+
+
+class JobResponse(BaseModel):
+    id: int
+    job_type: JobType
+    status: JobStatus
+    source_path: str
+    attempts: int
+    error_message: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class QueueResponse(BaseModel):
+    pending: int
+    running: int
+    failed: int
+    completed: int
+    jobs: list[JobResponse]
+
+
+class RescanResponse(BaseModel):
+    status: str
+    enqueued: int
+    skipped: int
+
+
+class AnalyzeBacklogResponse(BaseModel):
+    status: str
+    enqueued: int
+    skipped: int
