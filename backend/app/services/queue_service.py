@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -73,7 +74,7 @@ class QueueService:
         self._db.refresh(job)
         return EnqueueResult(job=job, enqueued=True)
 
-    def skip_reason_for_analyze(self, source_path: str) -> str | None:
+    def skip_reason_for_analyze(self, source_path: str, *, force: bool = False) -> str | None:
         active_job = self._db.execute(
             select(Job).where(
                 Job.source_path == source_path,
@@ -87,24 +88,37 @@ class QueueService:
         track = self._get_track(source_path)
         if track is None:
             return None
+        if force:
+            return None
         if track.integrated_lufs is not None:
             return SKIP_ALREADY_ANALYZED
         if track.status in (TrackStatus.READY, TrackStatus.REVIEW, TrackStatus.DUPLICATE):
             return SKIP_ALREADY_ROUTED
         return None
 
-    def enqueue_analyze(self, source_path: str) -> EnqueueResult:
-        skip = self.skip_reason_for_analyze(source_path)
+    def enqueue_analyze(
+        self,
+        source_path: str,
+        *,
+        force: bool = False,
+        payload: dict[str, object] | None = None,
+    ) -> EnqueueResult:
+        skip = self.skip_reason_for_analyze(source_path, force=force)
         if skip:
             return EnqueueResult(job=None, enqueued=False, skip_reason=skip)
 
-        job = Job(job_type=JobType.ANALYZE, status=JobStatus.PENDING, source_path=source_path)
+        job = Job(
+            job_type=JobType.ANALYZE,
+            status=JobStatus.PENDING,
+            source_path=source_path,
+            payload=json.dumps(payload) if payload else None,
+        )
         self._db.add(job)
         self._db.commit()
         self._db.refresh(job)
         return EnqueueResult(job=job, enqueued=True)
 
-    def skip_reason_for_fingerprint(self, source_path: str) -> str | None:
+    def skip_reason_for_fingerprint(self, source_path: str, *, force: bool = False) -> str | None:
         active_job = self._db.execute(
             select(Job).where(
                 Job.source_path == source_path,
@@ -114,6 +128,9 @@ class QueueService:
         ).scalar_one_or_none()
         if active_job is not None:
             return SKIP_ALREADY_QUEUED
+
+        if force:
+            return None
 
         track = self._get_track(source_path)
         if track is None:
@@ -136,22 +153,24 @@ class QueueService:
             return SKIP_ALREADY_ROUTED
         return None
 
-    def enqueue_fingerprint(self, source_path: str) -> EnqueueResult:
-        skip = self.skip_reason_for_fingerprint(source_path)
+    def enqueue_fingerprint(self, source_path: str, *, force: bool = False) -> EnqueueResult:
+        skip = self.skip_reason_for_fingerprint(source_path, force=force)
         if skip:
             return EnqueueResult(job=None, enqueued=False, skip_reason=skip)
 
+        payload = {"reprocess": True} if force else None
         job = Job(
             job_type=JobType.FINGERPRINT,
             status=JobStatus.PENDING,
             source_path=source_path,
+            payload=json.dumps(payload) if payload else None,
         )
         self._db.add(job)
         self._db.commit()
         self._db.refresh(job)
         return EnqueueResult(job=job, enqueued=True)
 
-    def skip_reason_for_route(self, source_path: str) -> str | None:
+    def skip_reason_for_route(self, source_path: str, *, force: bool = False) -> str | None:
         active_job = self._db.execute(
             select(Job).where(
                 Job.source_path == source_path,
@@ -161,6 +180,9 @@ class QueueService:
         ).scalar_one_or_none()
         if active_job is not None:
             return SKIP_ALREADY_QUEUED
+
+        if force:
+            return None
 
         track = self._get_track(source_path)
         if track is None:
@@ -173,7 +195,7 @@ class QueueService:
             return SKIP_ALREADY_ROUTED
         return None
 
-    def skip_reason_for_tag(self, source_path: str) -> str | None:
+    def skip_reason_for_tag(self, source_path: str, *, force: bool = False) -> str | None:
         active_job = self._db.execute(
             select(Job).where(
                 Job.source_path == source_path,
@@ -183,6 +205,9 @@ class QueueService:
         ).scalar_one_or_none()
         if active_job is not None:
             return SKIP_ALREADY_QUEUED
+
+        if force:
+            return None
 
         track = self._get_track(source_path)
         if track is None:
@@ -197,19 +222,25 @@ class QueueService:
             return SKIP_ALREADY_ROUTED
         return None
 
-    def enqueue_tag(self, source_path: str) -> EnqueueResult:
-        skip = self.skip_reason_for_tag(source_path)
+    def enqueue_tag(self, source_path: str, *, force: bool = False) -> EnqueueResult:
+        skip = self.skip_reason_for_tag(source_path, force=force)
         if skip:
             return EnqueueResult(job=None, enqueued=False, skip_reason=skip)
 
-        job = Job(job_type=JobType.TAG, status=JobStatus.PENDING, source_path=source_path)
+        payload = {"reprocess": True} if force else None
+        job = Job(
+            job_type=JobType.TAG,
+            status=JobStatus.PENDING,
+            source_path=source_path,
+            payload=json.dumps(payload) if payload else None,
+        )
         self._db.add(job)
         self._db.commit()
         self._db.refresh(job)
         return EnqueueResult(job=job, enqueued=True)
 
-    def enqueue_route(self, source_path: str) -> EnqueueResult:
-        skip = self.skip_reason_for_route(source_path)
+    def enqueue_route(self, source_path: str, *, force: bool = False) -> EnqueueResult:
+        skip = self.skip_reason_for_route(source_path, force=force)
         if skip:
             return EnqueueResult(job=None, enqueued=False, skip_reason=skip)
 
@@ -224,7 +255,7 @@ class QueueService:
             select(Track).where(Track.source_path == source_path)
         ).scalar_one_or_none()
 
-    def get_queue_summary(self, limit: int = 50) -> QueueResponse:
+    def get_queue_summary(self, limit: int = 200) -> QueueResponse:
         pending = self._count(JobStatus.PENDING)
         running = self._count(JobStatus.RUNNING)
         failed = self._count(JobStatus.FAILED)
@@ -245,6 +276,21 @@ class QueueService:
     def _count(self, status: JobStatus) -> int:
         stmt = select(func.count()).select_from(Job).where(Job.status == status)
         return self._db.scalar(stmt) or 0
+
+    def count_pending(self) -> int:
+        return self._count(JobStatus.PENDING)
+
+    def clear_failed_jobs(self) -> int:
+        jobs = (
+            self._db.execute(select(Job).where(Job.status == JobStatus.FAILED))
+            .scalars()
+            .all()
+        )
+        for job in jobs:
+            self._db.delete(job)
+        if jobs:
+            self._db.commit()
+        return len(jobs)
 
     def enqueue_watch_folder_scan(self) -> RescanResponse:
         settings = SettingsService(self._db).get_all()
@@ -285,6 +331,94 @@ class QueueService:
             else:
                 skipped += 1
         return RescanResponse(status="ok", enqueued=enqueued, skipped=skipped)
+
+    def enqueue_reanalyze_all(self) -> RescanResponse:
+        """Re-run analysis (and re-route) for tracks with a library or processing file."""
+        tracks = self._db.execute(select(Track)).scalars().all()
+        enqueued = 0
+        skipped = 0
+        for track in tracks:
+            if track.status in (TrackStatus.DUPLICATE, TrackStatus.ARCHIVED):
+                skipped += 1
+                continue
+            if not self._track_has_analyzable_audio(track):
+                skipped += 1
+                continue
+
+            track.bpm = None
+            track.bpm_confidence = None
+            track.musical_key = None
+            track.scale = None
+            track.camelot = None
+            track.key_confidence = None
+            track.energy = None
+            track.integrated_lufs = None
+            track.true_peak_db = None
+            track.artist = None
+            track.title = None
+            track.album = None
+            track.mix_version = None
+            track.musicbrainz_recording_id = None
+            track.tag_confidence = None
+            track.needs_metadata_review = False
+            track.tagged_at = None
+            track.status = TrackStatus.INGESTED
+            self._repair_paths_before_reanalyze(track)
+
+            self.cancel_active_jobs(track.source_path)
+            result = self.enqueue_analyze(
+                track.source_path,
+                force=True,
+                payload={"reprocess": True},
+            )
+            if result.enqueued:
+                enqueued += 1
+            else:
+                skipped += 1
+        self._db.commit()
+        return RescanResponse(status="ok", enqueued=enqueued, skipped=skipped)
+
+    @staticmethod
+    def _repair_paths_before_reanalyze(track: Track) -> None:
+        """Drop stale processing_path so analyze can use final_path or fail clearly."""
+        if track.processing_path and not Path(track.processing_path).is_file():
+            track.processing_path = None
+
+    @staticmethod
+    def _track_has_analyzable_audio(track: Track) -> bool:
+        if track.processing_path and Path(track.processing_path).is_file():
+            return True
+        return bool(track.final_path and Path(track.final_path).is_file())
+
+    def cancel_active_jobs(self, source_path: str) -> int:
+        jobs = (
+            self._db.execute(
+                select(Job).where(
+                    Job.source_path == source_path,
+                    Job.status.in_(ACTIVE_JOB_STATUSES),
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for job in jobs:
+            job.status = JobStatus.CANCELLED
+        if jobs:
+            self._db.commit()
+        return len(jobs)
+
+    def reset_interrupted_jobs(self) -> int:
+        """Return RUNNING jobs to PENDING (e.g. after worker crash or container restart)."""
+        jobs = (
+            self._db.execute(select(Job).where(Job.status == JobStatus.RUNNING))
+            .scalars()
+            .all()
+        )
+        for job in jobs:
+            job.status = JobStatus.PENDING
+        if jobs:
+            self._db.commit()
+        return len(jobs)
 
     def claim_next_pending(self) -> Job | None:
         job = (

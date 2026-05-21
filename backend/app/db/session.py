@@ -2,7 +2,7 @@ from collections.abc import Generator
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.db.base import Base
@@ -25,8 +25,19 @@ def _ensure_sqlite_parent_dir(database_url: str) -> None:
 def init_engine(database_url: str) -> None:
     global _engine, _SessionLocal
     _ensure_sqlite_parent_dir(database_url)
-    connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
+    is_sqlite = database_url.startswith("sqlite")
+    connect_args = {"check_same_thread": False, "timeout": 30} if is_sqlite else {}
     _engine = create_engine(database_url, connect_args=connect_args)
+
+    if is_sqlite:
+
+        @event.listens_for(_engine, "connect")
+        def _sqlite_pragmas(dbapi_conn, connection_record) -> None:
+            cursor = dbapi_conn.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA busy_timeout=30000")
+            cursor.close()
+
     _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
 
 

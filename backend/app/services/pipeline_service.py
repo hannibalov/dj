@@ -25,10 +25,13 @@ class PipelineService:
 
     def get_snapshot(self) -> PipelineSnapshot:
         queue = QueueService(self._db).get_queue_summary()
-        tracks = TrackService(self._db).list_tracks()
+        track_service = TrackService(self._db)
         return PipelineSnapshot(
             queue=queue,
-            tracks=tracks,
+            tracks=track_service.list_tracks(),
+            track_summary=track_service.status_summary(),
             worker_active=queue.running > 0,
+            queue_stalled=queue.pending > 0 and queue.running == 0,
+            queue_backlogged=queue.pending > 0,
             last_event=get_last_pipeline_event(),
         )

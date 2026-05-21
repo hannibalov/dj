@@ -12,6 +12,7 @@ from app.models.fingerprint import Fingerprint
 from app.models.job import Job
 from app.models.track import Track
 from app.services.queue_service import QueueService
+from app.utils.job_payload import job_payload
 from app.services.settings_service import SettingsService
 from app.utils.workspace_files import clear_stale_processing_copy, move_into_destination
 
@@ -41,7 +42,7 @@ class FingerprintService:
         if existing_fp is not None:
             job.status = JobStatus.COMPLETED
             self._db.commit()
-            self._after_fingerprint(track, existing_fp.fingerprint_hash)
+            self._after_fingerprint(track, existing_fp.fingerprint_hash, job)
             logger.info("fingerprint_skipped_already_done", source=job.source_path)
             return
 
@@ -73,14 +74,20 @@ class FingerprintService:
             source=job.source_path,
             hash=data.fingerprint_hash[:12],
         )
-        self._after_fingerprint(track, data.fingerprint_hash)
+        self._after_fingerprint(track, data.fingerprint_hash, job)
 
-    def _after_fingerprint(self, track: Track, fingerprint_hash: str) -> None:
+    def _after_fingerprint(self, track: Track, fingerprint_hash: str, job: Job) -> None:
         self._db.refresh(track)
+        force_tag = bool(job_payload(job).get("reprocess"))
+        queue = QueueService(self._db)
+        if force_tag:
+            queue.enqueue_tag(track.source_path, force=True)
+            logger.info("reprocess_tag_enqueued", source=track.source_path)
+            return
         group = self._get_group_by_hash(fingerprint_hash)
         if group is not None and group.preferred_track_id is not None:
             if track.id == group.preferred_track_id:
-                QueueService(self._db).enqueue_tag(track.source_path)
+                queue.enqueue_tag(track.source_path, force=force_tag)
                 logger.info("duplicate_manual_preferred_for_tag", source=track.source_path)
             else:
                 self._route_to_duplicates_folder(track, fingerprint_hash)
@@ -90,7 +97,7 @@ class FingerprintService:
         preferred_ids = preferred_track_ids(group_tracks)
 
         if track.id in preferred_ids:
-            QueueService(self._db).enqueue_tag(track.source_path)
+            queue.enqueue_tag(track.source_path, force=force_tag)
             logger.info("duplicate_preferred_for_tag", source=track.source_path)
             return
 

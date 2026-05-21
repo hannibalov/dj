@@ -9,6 +9,16 @@
 
 You only need the small `deploy/docker-compose.yml` on the Pi so Docker knows how to run all five containers together.
 
+### Which compose file is which?
+
+| File | Use on |
+|------|--------|
+| **`deploy/docker-compose.yml`** (this folder) | **Pi / production** — `docker compose pull` using `DOCKER_USER` from `.env` |
+| **`docker-compose.yml`** (repo root) | **Mac / dev** — `docker compose up -d --build` from a git clone |
+| **`docker-compose.pull.yml`** (repo root) | **Deprecated** — old GHCR-style `DJ_BACKEND_IMAGE` variables; use `deploy/` instead |
+
+Do not copy both compose files to the Pi; only **`deploy/docker-compose.yml`**.
+
 ---
 
 ## 1. Publish from your Mac
@@ -92,6 +102,111 @@ Edit `docker-compose.yml` under `api`, `worker`, and `watcher`:
 ```bash
 cd ~/dj-pipeline
 docker compose pull && docker compose up -d
+```
+
+Open the dashboard → **Reanalyze all** if a release fixed analysis or tagging and you need to refresh existing tracks. The **worker** service must be running until the job queue is empty.
+
+After upgrading, it is normal to see **Backlogged** with many pending jobs on a Pi — the worker runs **one job at a time** (analyze/ffmpeg is slow). Artist/title fill in at the **TAG** step, not immediately after reanalyze.
+
+If you accumulated hundreds of **failed jobs** from an older image (e.g. TAG errors), use **Clear failed jobs** on the dashboard after deploying the fix, then **Reset** or **Reanalyze** affected tracks. See [Dashboard](../README.md#dashboard) in the main README.
+
+**Example** (images published as `rodriguescu`):
+
+```bash
+docker pull rodriguescu/dj-pipeline-backend:latest
+docker pull rodriguescu/dj-pipeline-frontend:latest
+```
+
+---
+
+
+## Resource limits on the Pi (CPU / memory)
+
+`deploy/docker-compose.yml` sets `cpus` and `mem_limit` per service. If you see:
+
+```text
+Your kernel does not support memory limit capabilities or the cgroup is not mounted.
+```
+
+those limits are **not enforced** — containers can use all free RAM/CPU on the Pi until you fix cgroups or use another method below.
+
+### Option A — Enable cgroups (recommended; makes Compose limits work)
+
+On **Raspberry Pi OS**, edit the kernel cmdline (path may be `/boot/firmware/cmdline.txt` or `/boot/cmdline.txt`). On the **same line** as the existing options, add a space and:
+
+```text
+cgroup_enable=cpuset cgroup_enable=memory cgroup_memory=1
+```
+
+Reboot, then check:
+
+```bash
+grep memory /proc/cgroup   # or: cat /sys/fs/cgroup/cgroup.controllers  (cgroup v2)
+sudo docker compose up -d
+```
+
+Re-create containers so limits apply: `docker compose up -d --force-recreate`.
+
+If limits still fail, ensure Docker uses the cgroup driver expected by your OS (`docker info | grep -i cgroup`). On Bookworm, Docker usually works after the cmdline change above.
+
+### Option B — Operational (no kernel change)
+
+| Approach | Effect |
+|----------|--------|
+| **Stop the worker when idle** | `docker compose stop worker` — pipeline pauses; watcher/API stay up. Start again: `docker compose start worker`. |
+| **Scale worker to zero** | `docker compose up -d --scale worker=0` (not in default compose; use `stop` instead). |
+| **Process in batches** | Drop a few files in watch, wait for jobs to finish, then add more — only one analyze/ffmpeg job runs at a time in the worker. |
+| **Lower ffmpeg load** | Heavy step is analyze (ffmpeg). Fewer simultaneous files = less spike load. |
+
+The worker already runs **one job at a time**; the main risk is a single ffmpeg/ANALYZE pass using a full CPU core and ~200–500 MB RAM.
+
+### Option C — Host tools (limits without Docker cgroups)
+
+**systemd** — run only the worker under a resource cap (example unit fragment):
+
+```ini
+[Service]
+CPUQuota=50%
+MemoryMax=512M
+```
+
+**nice** — lower priority so other Pi services win (soft limit, not a hard cap). In `docker-compose.yml` override:
+
+```yaml
+  worker:
+    command: ["nice", "-n", "15", "python", "-m", "app.workers.main"]
+```
+
+**cpulimit** — install on the Pi and wrap the worker PID (fragile across restarts; usually not worth it with Compose).
+
+### What uses resources?
+
+| Service | Typical load |
+|---------|----------------|
+| **worker** | High during ANALYZE (ffmpeg); low otherwise |
+| **api** | Low |
+| **watcher** | Very low |
+| **scheduler** | Very low |
+| **frontend** | Low (nginx static + proxy) |
+
+Tuning compose `mem_limit` / `cpus` is the cleanest approach once **Option A** is in place.
+
+---
+
+## Dashboard troubleshooting (Pi)
+
+| Symptom | Likely cause | What to do |
+|---------|----------------|------------|
+| All tracks **In pipeline**, no artist/title | TAG not reached yet, or TAG failed | Check **Recent jobs** → errors on `tag` rows. Ensure `DJ_ACOUSTID_API_KEY` is set. Wait for queue or **Reanalyze** after fix. |
+| **Worker idle** but 0 pending | Queue empty; tracks stuck from earlier failures | **Reset** track or **Reanalyze all**; **Clear failed jobs** |
+| **Worker idle**, many **pending** | Misleading label between jobs | Should show **Backlogged** on new UI; confirm `worker` is Up: `docker compose logs worker --tail 30` |
+| **Stalled**, pending > 0, running = 0 | Worker stopped or jobs stuck `running` | `docker compose start worker` or **Retry stalled jobs** |
+| Pipeline shows **100** songs but you have more | Old image capped list at 100 | Upgrade image; chips use full DB counts on current builds |
+| **540 failed jobs** | Historical failures | **Clear failed jobs** after deploying fixes (does not fix tracks by itself) |
+
+```bash
+docker compose ps
+docker compose logs worker --tail 50
 ```
 
 ---

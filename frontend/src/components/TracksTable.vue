@@ -2,9 +2,15 @@
   <v-card>
     <v-card-title class="d-flex align-center flex-wrap ga-2">
       <span>Tracks</span>
+      <span
+        v-if="totalTracks > tracks.length"
+        class="text-caption text-medium-emphasis"
+      >
+        Showing {{ tracks.length }} of {{ totalTracks }} (newest first)
+      </span>
       <v-spacer />
       <v-select
-        v-model="statusFilter"
+        v-model="statusFilterModel"
         :items="statusFilterItems"
         label="Status"
         density="compact"
@@ -109,6 +115,17 @@
               Approve
             </v-btn>
             <v-btn
+              v-if="item.status === 'failed'"
+              size="x-small"
+              color="error"
+              variant="tonal"
+              :loading="actionLoadingId === item.id && actionKind === 'delete'"
+              :disabled="actionLoadingId != null && actionLoadingId !== item.id"
+              @click="onDelete(item.id)"
+            >
+              Delete
+            </v-btn>
+            <v-btn
               size="x-small"
               variant="text"
               :loading="actionLoadingId === item.id && actionKind === 'reset'"
@@ -127,7 +144,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
-import { confirmTrackReview, resetTrack } from '@/services/trackService'
+import { confirmTrackReview, deleteFailedTrack, resetTrack } from '@/services/trackService'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { useSnackbarStore } from '@/stores/snackbarStore'
 import type { Track, TrackStatus } from '@/types/track'
@@ -141,31 +158,40 @@ import {
 
 const props = defineProps<{
   tracks: Track[]
+  totalTracks: number
   loading: boolean
+  statusFilter?: TrackStatus | null
+}>()
+
+const emit = defineEmits<{
+  'update:statusFilter': [value: TrackStatus | null]
 }>()
 
 const pipeline = usePipelineStore()
 const snackbar = useSnackbarStore()
 
 const actionLoadingId = ref<number | null>(null)
-const actionKind = ref<'reset' | 'confirm' | null>(null)
+const actionKind = ref<'reset' | 'confirm' | 'delete' | null>(null)
 
-const statusFilter = ref<TrackStatus | null>(null)
+const statusFilterModel = computed({
+  get: () => props.statusFilter ?? null,
+  set: (value: TrackStatus | null) => emit('update:statusFilter', value),
+})
 
 const statusFilterItems = [
   { title: 'Queued', value: 'queued' },
   { title: 'Ingesting', value: 'processing' },
-  { title: 'In processing folder', value: 'ingested' },
+  { title: 'In pipeline', value: 'ingested' },
   { title: 'Ready', value: 'ready' },
   { title: 'Needs review', value: 'review' },
   { title: 'Failed', value: 'failed' },
 ]
 
 const filteredTracks = computed(() => {
-  if (!statusFilter.value) {
+  if (!statusFilterModel.value) {
     return props.tracks
   }
-  return props.tracks.filter((t) => t.status === statusFilter.value)
+  return props.tracks.filter((t) => t.status === statusFilterModel.value)
 })
 
 const headers = [
@@ -178,8 +204,23 @@ const headers = [
   { title: 'Energy', key: 'energy' },
   { title: 'Loudness', key: 'loudness', sortable: false, width: '200px' },
   { title: 'Library copy', key: 'final_path' },
-  { title: 'Actions', key: 'actions', sortable: false, width: '160px' },
+  { title: 'Actions', key: 'actions', sortable: false, width: '200px' },
 ]
+
+async function onDelete(trackId: number): Promise<void> {
+  actionLoadingId.value = trackId
+  actionKind.value = 'delete'
+  try {
+    const result = await deleteFailedTrack(trackId)
+    snackbar.show(result.message, { color: 'success' })
+    await pipeline.load()
+  } catch (e) {
+    snackbar.show(e instanceof Error ? e.message : 'Delete failed', { color: 'error' })
+  } finally {
+    actionLoadingId.value = null
+    actionKind.value = null
+  }
+}
 
 async function onReset(trackId: number): Promise<void> {
   actionLoadingId.value = trackId

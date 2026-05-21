@@ -36,6 +36,15 @@ watch / POST /queue/rescan
 
 ---
 
+## Dashboard & operations
+
+| Doc | Audience |
+|-----|----------|
+| [README § Dashboard](../README.md#dashboard) | Actions, pipeline vs job queue, worker states, API summary |
+| [deploy/README § Dashboard troubleshooting](../deploy/README.md#dashboard-troubleshooting-pi) | Pi: backlog, failed jobs, worker logs |
+
+---
+
 ## System dependencies
 
 | Tool | Phase | `install.sh` | Docker image |

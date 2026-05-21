@@ -34,6 +34,8 @@ class RoutingService:
             track.status in (TrackStatus.READY, TrackStatus.REVIEW, TrackStatus.DUPLICATE)
             and track.final_path
             and Path(track.final_path).is_file()
+            and track.processing_path
+            and Path(track.processing_path).is_file()
         ):
             track.processing_path = clear_stale_processing_copy(
                 processing_path=track.processing_path,

@@ -99,7 +99,13 @@ def run_once() -> bool:
             logger.error("job_failed", job_id=job.id, error=str(exc))
             notify_pipeline_changed(f"Job failed: {_basename(job.source_path)} — {exc}")
         else:
-            notify_pipeline_changed("Worker idle")
+            pending = queue.count_pending()
+            if pending == 0:
+                notify_pipeline_changed("Worker idle")
+            else:
+                notify_pipeline_changed(
+                    f"Worker between jobs ({pending} still pending in queue)"
+                )
         return True
     finally:
         db.close()
@@ -110,6 +116,13 @@ def main() -> None:
     configure_logging(settings.log_level)
     init_engine(settings.database_url)
     get_engine()
+    db = get_session_factory()()
+    try:
+        reset_count = QueueService(db).reset_interrupted_jobs()
+        if reset_count:
+            logger.info("worker_reset_interrupted_jobs", count=reset_count)
+    finally:
+        db.close()
     logger.info("worker_started")
     while True:
         processed = run_once()

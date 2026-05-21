@@ -1,5 +1,13 @@
-# Deprecated: use deploy/docker-compose.yml on the Pi (no repo clone).
-# See deploy/README.md and https://github.com/hannibalov/dj/tree/main/deploy
+# DEPRECATED — do not use for new deployments.
+#
+# This was an early pull-only compose file using full image URLs:
+#   DJ_BACKEND_IMAGE, DJ_FRONTEND_IMAGE (e.g. ghcr.io/...).
+#
+# Use instead:
+#   deploy/docker-compose.yml  — Pi / production (DOCKER_USER on Docker Hub)
+#   docker-compose.yml         — developers (build from source in repo root)
+#
+# See deploy/README.md
 
 x-docker-env: &docker-env
   DJ_API_INTERNAL_URL: http://api:8000

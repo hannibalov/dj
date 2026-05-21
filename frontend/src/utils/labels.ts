@@ -4,7 +4,7 @@ import type { TrackStatus } from '@/types/track'
 const TRACK_STATUS_LABELS: Record<TrackStatus, string> = {
   queued: 'Queued',
   processing: 'Ingesting…',
-  ingested: 'In processing folder',
+  ingested: 'In pipeline',
   ready: 'Ready',
   review: 'Needs review',
   duplicate: 'Duplicate',

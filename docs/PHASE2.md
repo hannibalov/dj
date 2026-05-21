@@ -51,21 +51,29 @@ After ingest (`track.status == ingested`), run analysis and route tracks to `rea
 | Method | Path | Purpose |
 |--------|------|---------|
 | POST | `/queue/analyze-backlog` | Enqueue `ANALYZE` for `ingested` tracks without `integrated_lufs` |
+| POST | `/queue/reanalyze-all` | Full reprocess: `ANALYZE` → `FINGERPRINT` → `TAG` → `ROUTE` with `reprocess` payload |
+| POST | `/queue/unstick` | Reset interrupted `running` jobs → `pending` |
+| POST | `/queue/clear-failed-jobs` | Remove failed job rows from history |
 
 ### Frontend — dashboard
 
 | Feature | Location |
 |---------|----------|
 | Action bar (top) | `frontend/src/components/DashboardActions.vue` |
-| Rescan + Analyze backlog buttons | `DashboardPage.vue` |
-| Tracks: BPM, key, energy, **loudness** (chip + LUFS/peak) | `frontend/src/components/TracksTable.vue` |
+| Pipeline stage counts (all tracks in DB) | `frontend/src/components/QueueStatsCard.vue`, `utils/pipelineCounts.ts` |
+| Worker: Processing / Backlogged / Stalled | `frontend/src/components/WorkerStatusCard.vue` |
+| Rescan, Analyze backlog, Reanalyze all | `DashboardPage.vue` |
+| Tracks: BPM, key, energy, **loudness**, artist/title | `frontend/src/components/TracksTable.vue` |
+| Delete failed track; filter by stage chip | `TracksTable.vue`, `trackService.ts` |
+| Clear failed jobs / Clear failed tracks | `QueueStatsCard.vue`, `WorkerStatusCard.vue` |
 | Loudness helpers (thresholds, labels) | `frontend/src/utils/loudness.ts` |
-| Status filter | `TracksTable.vue` |
 | Global snackbars (10s auto-dismiss) | `frontend/src/stores/snackbarStore.ts`, `AppSnackbar.vue` |
 | Pipeline feedback via snackbar | `frontend/src/stores/pipelineStore.ts` |
 | Full-height layout / background | `frontend/src/styles/main.css`, `App.vue` |
 
-Snackbar colors: success (rescan/backlog OK), error (failures). No inline alerts on the dashboard for queue actions.
+Snackbar colors: success (rescan/backlog OK), error (failures). See [README § Dashboard](../README.md#dashboard) for operator guide.
+
+**Tagging note:** `app/metadata/acoustid_lookup.py` must call `acoustid.parse_lookup_result()` on the JSON from `acoustid.lookup()` — not `list()` on the raw dict (regression caused TAG failures: “too many values to unpack”).
 
 ### Tests
 

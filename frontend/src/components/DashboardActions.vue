@@ -26,6 +26,15 @@
         >
           Analyze backlog
         </v-btn>
+        <v-btn
+          color="secondary"
+          variant="outlined"
+          prepend-icon="mdi-refresh"
+          :loading="loading"
+          @click="$emit('reanalyze-all')"
+        >
+          Reanalyze all
+        </v-btn>
       </span>
     </v-card-text>
   </v-card>
@@ -39,5 +48,6 @@ defineProps<{
 defineEmits<{
   rescan: []
   'analyze-backlog': []
+  'reanalyze-all': []
 }>()
 </script>

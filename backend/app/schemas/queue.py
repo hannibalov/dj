@@ -36,3 +36,9 @@ class AnalyzeBacklogResponse(BaseModel):
     status: str
     enqueued: int
     skipped: int
+
+
+class ClearFailedJobsResponse(BaseModel):
+    status: str
+    deleted_count: int
+    message: str

@@ -44,8 +44,8 @@ def measure_loudness(
         return None, None
 
     output = proc.stderr + proc.stdout
-    integrated = _parse_first(_INTEGRATED_RE, output)
-    peak = _parse_first(_PEAK_RE, output)
+    integrated = _parse_integrated_lufs(output)
+    peak = _parse_last(_PEAK_RE, output)
     if proc.returncode != 0 and integrated is None:
         logger.warning(
             "loudness_ffmpeg_error",
@@ -55,8 +55,18 @@ def measure_loudness(
     return integrated, peak
 
 
-def _parse_first(pattern: re.Pattern[str], text: str) -> float | None:
-    match = pattern.search(text)
-    if not match:
-        return None
-    return float(match.group(1))
+def _parse_integrated_lufs(text: str) -> float | None:
+    """Prefer the final Summary block; fall back to the last progress-line I: value."""
+    summary_start = text.rfind("Summary:")
+    if summary_start >= 0:
+        value = _parse_last(_INTEGRATED_RE, text[summary_start:])
+        if value is not None:
+            return value
+    return _parse_last(_INTEGRATED_RE, text)
+
+
+def _parse_last(pattern: re.Pattern[str], text: str) -> float | None:
+    value: float | None = None
+    for match in pattern.finditer(text):
+        value = float(match.group(1))
+    return value

@@ -110,6 +110,53 @@ def test_tag_low_confidence_sets_metadata_review(db_session: Session, tmp_path: 
     assert track.needs_metadata_review is True
 
 
+def test_tag_reprocess_runs_even_when_already_tagged(db_session: Session, tmp_path: Path) -> None:
+    processing = tmp_path / "processing" / "song.mp3"
+    processing.parent.mkdir(parents=True)
+    processing.write_bytes(b"audio")
+    source = str(tmp_path / "watch" / "song.mp3")
+
+    from datetime import UTC, datetime
+
+    track = Track(
+        source_path=source,
+        processing_path=str(processing),
+        status=TrackStatus.INGESTED,
+        artist="Stale",
+        title="Name",
+        tagged_at=datetime.now(UTC),
+    )
+    job = Job(
+        job_type=JobType.TAG,
+        status=JobStatus.PENDING,
+        source_path=source,
+        payload='{"reprocess": true}',
+    )
+    db_session.add(track)
+    db_session.add(job)
+    db_session.commit()
+
+    match = MetadataMatch(
+        artist="Fresh Artist",
+        title="Fresh Title",
+        album=None,
+        mix_version=None,
+        musicbrainz_recording_id=None,
+        confidence=0.9,
+        source="acoustid",
+    )
+
+    with (
+        patch("app.services.tag_service.match_track_metadata", return_value=match),
+        patch("app.services.tag_service.write_tags"),
+    ):
+        TagService(db_session).process_tag_job(job)
+
+    db_session.refresh(track)
+    assert track.artist == "Fresh Artist"
+    assert track.title == "Fresh Title"
+
+
 def test_route_sends_low_metadata_confidence_to_review(db_session: Session, tmp_path: Path) -> None:
     _folders(db_session, tmp_path)
     renamed = tmp_path / "processing" / "Wonderwall - Oasis (Original Mix).mp3"

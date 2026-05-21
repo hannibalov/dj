@@ -110,6 +110,81 @@ def test_reset_fails_when_watch_and_library_copy_missing(
         TrackLifecycleService(db_session).reset_track(track.id)
 
 
+def test_delete_failed_track_removes_files_jobs_and_db_row(
+    db_session: Session, tmp_path: Path
+) -> None:
+    _folders(db_session, tmp_path)
+    processing_file = tmp_path / "processing" / "bad.mp3"
+    processing_file.parent.mkdir(parents=True)
+    processing_file.write_bytes(b"bad")
+    watch_file = tmp_path / "watch" / "bad.mp3"
+    watch_file.parent.mkdir(parents=True)
+    watch_file.write_bytes(b"watch")
+
+    track = Track(
+        source_path=str(watch_file),
+        processing_path=str(processing_file),
+        status=TrackStatus.FAILED,
+    )
+    db_session.add(track)
+    db_session.commit()
+    db_session.add(
+        Job(
+            job_type=JobType.ANALYZE,
+            source_path=str(watch_file),
+            status=JobStatus.FAILED,
+            error_message="boom",
+        )
+    )
+    db_session.commit()
+
+    with patch("app.services.track_lifecycle_service.notify_pipeline_changed"):
+        TrackLifecycleService(db_session).delete_failed_track(track.id)
+
+    assert db_session.get(Track, track.id) is None
+    assert not processing_file.exists()
+    assert not watch_file.exists()
+    jobs = db_session.execute(select(Job).where(Job.source_path == str(watch_file))).all()
+    assert jobs == []
+
+
+def test_delete_failed_track_rejects_non_failed(db_session: Session, tmp_path: Path) -> None:
+    _folders(db_session, tmp_path)
+    track = Track(
+        source_path=str(tmp_path / "watch" / "ok.mp3"),
+        status=TrackStatus.READY,
+    )
+    db_session.add(track)
+    db_session.commit()
+
+    with pytest.raises(TrackLifecycleError, match="Only failed tracks"):
+        TrackLifecycleService(db_session).delete_failed_track(track.id)
+
+
+def test_delete_all_failed_tracks(db_session: Session, tmp_path: Path) -> None:
+    _folders(db_session, tmp_path)
+    for name in ("a.mp3", "b.mp3"):
+        path = tmp_path / "watch" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"x")
+        db_session.add(Track(source_path=str(path), status=TrackStatus.FAILED))
+    db_session.add(
+        Track(
+            source_path=str(tmp_path / "watch" / "ok.mp3"),
+            status=TrackStatus.READY,
+        )
+    )
+    db_session.commit()
+
+    with patch("app.services.track_lifecycle_service.notify_pipeline_changed"):
+        count = TrackLifecycleService(db_session).delete_all_failed_tracks()
+
+    assert count == 2
+    remaining = db_session.execute(select(Track)).scalars().all()
+    assert len(remaining) == 1
+    assert remaining[0].status == TrackStatus.READY
+
+
 def test_confirm_review_moves_to_ready_and_removes_sibling_duplicate(
     db_session: Session, tmp_path: Path
 ) -> None:

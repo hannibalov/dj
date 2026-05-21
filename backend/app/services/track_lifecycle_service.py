@@ -74,6 +74,32 @@ class TrackLifecycleService:
         logger.info("track_reset", track_id=track_id, source=track.source_path)
         return track
 
+    def delete_failed_track(self, track_id: int) -> None:
+        track = self._get_track_or_raise(track_id)
+        if track.status != TrackStatus.FAILED:
+            raise TrackLifecycleError("Only failed tracks can be deleted")
+        source = track.source_path
+        name = Path(source).name
+        self._purge_failed_track(track)
+        self._db.commit()
+        notify_pipeline_changed(f"Deleted failed track: {name}")
+        logger.info("track_delete_failed", track_id=track_id, source=source)
+
+    def delete_all_failed_tracks(self) -> int:
+        failed = (
+            self._db.execute(select(Track).where(Track.status == TrackStatus.FAILED))
+            .scalars()
+            .all()
+        )
+        for track in failed:
+            self._purge_failed_track(track)
+        count = len(failed)
+        if count:
+            self._db.commit()
+            notify_pipeline_changed(f"Deleted {count} failed track(s)")
+            logger.info("tracks_delete_all_failed", count=count)
+        return count
+
     def confirm_review(self, track_id: int) -> Track:
         track = self._get_track_or_raise(track_id)
         if track.status != TrackStatus.REVIEW:
@@ -150,6 +176,46 @@ class TrackLifecycleService:
             .all()
         )
         return list(rows)
+
+    def _purge_failed_track(self, track: Track) -> None:
+        settings = SettingsService(self._db).get_all()
+        watch_root = Path(settings.watch_folder)
+        self._cancel_active_jobs(track.source_path)
+        self._delete_workspace_files(track)
+        self._delete_failed_folder_copy(track, Path(settings.failed_folder))
+        self._delete_fingerprint(track.id)
+        self._delete_jobs_for_source(track.source_path)
+        self._clear_duplicate_group_preference(track.id)
+        remove_watch_source(track.source_path, watch_root)
+        self._db.delete(track)
+
+    def _delete_failed_folder_copy(self, track: Track, failed_root: Path) -> None:
+        if not failed_root.is_dir():
+            return
+        basename = Path(track.source_path).name
+        candidate = failed_root / basename
+        if candidate.is_file():
+            remove_workspace_file(candidate)
+
+    def _delete_jobs_for_source(self, source_path: str) -> None:
+        jobs = (
+            self._db.execute(select(Job).where(Job.source_path == source_path)).scalars().all()
+        )
+        for job in jobs:
+            self._db.delete(job)
+
+    def _clear_duplicate_group_preference(self, track_id: int) -> None:
+        from app.models.duplicate_group import DuplicateGroup
+
+        groups = (
+            self._db.execute(
+                select(DuplicateGroup).where(DuplicateGroup.preferred_track_id == track_id)
+            )
+            .scalars()
+            .all()
+        )
+        for group in groups:
+            group.preferred_track_id = None
 
     def _cancel_active_jobs(self, source_path: str) -> None:
         jobs = (

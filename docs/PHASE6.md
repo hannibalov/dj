@@ -69,7 +69,7 @@ Items deferred while shipping core pipeline features. **Not part of Phase 6a** u
 |------|------|
 | Images | `docker/Dockerfile.backend` (ffmpeg + fpcalc, production pip install) |
 | Images | `docker/Dockerfile.frontend` (nginx static + API/WS proxy) |
-| Compose | `docker-compose.yml` — api, worker, watcher, scheduler, frontend, db-init |
+| Compose | Root `docker-compose.yml` (build); `deploy/docker-compose.yml` (Pi pull via `DOCKER_USER`) |
 | Networking | nginx proxies `/api` and `/ws` to API container |
 | Deploy bundle | `deploy/` — compose + `.env.example` + `install-on-pi.sh` (curl, no clone) |
 | CI | `.github/workflows/docker-publish.yml` → GHCR multi-arch |
@@ -151,10 +151,13 @@ docker compose pull && docker compose up -d
 
 Only `deploy/docker-compose.yml`, `.env`, and `data/` live on the Pi.
 
+**Why two compose files?** Root `docker-compose.yml` is for developers who clone the repo and **build** locally. `deploy/docker-compose.yml` is for the Pi: it **pulls** `DOCKER_USER/dj-pipeline-*` images and needs no source tree. The legacy `docker-compose.pull.yml` (full `DJ_*_IMAGE` URLs) is deprecated.
+
 ### Publish images
 
-- **CI:** `.github/workflows/docker-publish.yml` → GHCR `ghcr.io/hannibalov/dj-library-pipeline-{backend,frontend}:latest`
-- **Local:** `docker buildx` with `--platform linux/arm64 --push` (documented in deploy README)
+- **Docker Hub (recommended for Pi):** `DOCKER_USER=yourhub ./deploy/publish-dockerhub.sh` on a Mac → Pi runs `docker compose pull`
+- **CI (optional):** `.github/workflows/docker-publish.yml` → GHCR
+- **Local:** `docker buildx` with `--platform linux/arm64 --push` (see [deploy/README.md](../deploy/README.md))
 
 Set GHCR packages to **public** so the Pi can pull without `docker login`.
 

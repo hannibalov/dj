@@ -1,6 +1,9 @@
 <template>
   <v-card>
-    <v-card-title>Recent jobs</v-card-title>
+    <v-card-title class="d-flex flex-wrap align-center ga-2">
+      <span>Recent jobs</span>
+      <span class="text-caption text-medium-emphasis">(last 200)</span>
+    </v-card-title>
     <v-card-text>
       <v-data-table
         :headers="headers"
@@ -8,7 +11,7 @@
         :loading="loading"
         item-key="id"
         density="compact"
-        :items-per-page="10"
+        :items-per-page="25"
         no-data-text="No jobs yet"
       >
         <template #[`item.filename`]="{ item }">

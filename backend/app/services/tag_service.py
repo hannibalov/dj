@@ -16,6 +16,7 @@ from app.models.fingerprint import Fingerprint
 from app.models.job import Job
 from app.models.track import Track
 from app.services.queue_service import QueueService
+from app.utils.job_payload import job_payload
 from app.services.settings_service import SettingsService
 
 logger = get_logger("TAGGER")
@@ -40,10 +41,12 @@ class TagService:
             self._db.commit()
             return
 
-        if track.tagged_at is not None:
+        reprocess = bool(job_payload(job).get("reprocess"))
+
+        if track.tagged_at is not None and not reprocess:
             job.status = JobStatus.COMPLETED
             self._db.commit()
-            QueueService(self._db).enqueue_route(track.source_path)
+            QueueService(self._db).enqueue_route(track.source_path, force=reprocess)
             logger.info("tag_skipped_already_done", source=job.source_path)
             return
 
@@ -52,12 +55,15 @@ class TagService:
         settings = SettingsService(self._db).get_all()
         fp = self._get_fingerprint(track.id)
 
+        watch_path = Path(track.source_path)
         match = match_track_metadata(
             audio_path,
             raw_fingerprint=fp.raw_fingerprint if fp else None,
             duration_seconds=fp.duration_seconds if fp else None,
             acoustid_api_key=env.acoustid_api_key,
             confidence_threshold=settings.tag_confidence_threshold,
+            reprocess=reprocess,
+            filename_hint_path=watch_path if watch_path.is_file() else None,
         )
 
         threshold = settings.tag_confidence_threshold
@@ -70,7 +76,7 @@ class TagService:
             job.status = JobStatus.COMPLETED
             self._db.commit()
             logger.info("tag_no_match", source=job.source_path)
-            QueueService(self._db).enqueue_route(track.source_path)
+            QueueService(self._db).enqueue_route(track.source_path, force=reprocess)
             return
 
         new_name = build_library_filename(
@@ -97,6 +103,7 @@ class TagService:
         except Exception as exc:
             job.status = JobStatus.FAILED
             job.error_message = f"Failed to write tags: {exc}"
+            track.status = TrackStatus.FAILED
             self._db.commit()
             logger.error("tag_write_failed", source=job.source_path, error=str(exc))
             return
@@ -120,7 +127,7 @@ class TagService:
             confidence=match.confidence,
             review=review,
         )
-        QueueService(self._db).enqueue_route(track.source_path)
+        QueueService(self._db).enqueue_route(track.source_path, force=reprocess)
 
     @staticmethod
     def _unique_dest(dest: Path, track_id: int) -> Path:

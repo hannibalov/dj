@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 import { fetchPipelineStatus } from '@/services/pipelineService'
-import { analyzeBacklog, rescanQueue } from '@/services/queueService'
+import { analyzeBacklog, reanalyzeAll, rescanQueue } from '@/services/queueService'
 import type { PipelineSnapshot } from '@/types/pipeline'
 
 import { useSnackbarStore } from './snackbarStore'
@@ -17,6 +17,9 @@ export const usePipelineStore = defineStore('pipeline', () => {
   const queue = computed(() => snapshot.value?.queue ?? null)
   const tracks = computed(() => snapshot.value?.tracks ?? [])
   const workerActive = computed(() => snapshot.value?.worker_active ?? false)
+  const queueStalled = computed(() => snapshot.value?.queue_stalled ?? false)
+  const queueBacklogged = computed(() => snapshot.value?.queue_backlogged ?? false)
+  const trackSummary = computed(() => snapshot.value?.track_summary ?? null)
   const lastEvent = computed(() => snapshot.value?.last_event ?? null)
 
   function applySnapshot(data: PipelineSnapshot): void {
@@ -67,6 +70,24 @@ export const usePipelineStore = defineStore('pipeline', () => {
     }
   }
 
+  async function runReanalyzeAll(): Promise<void> {
+    loading.value = true
+    try {
+      const result = await reanalyzeAll()
+      snackbar.show(
+        `Reanalyze all: enqueued ${result.enqueued}, skipped ${result.skipped}. ` +
+          'Runs analyze → fingerprint → tag → route (worker must be running).',
+        { color: 'success' },
+      )
+    } catch (e) {
+      snackbar.show(e instanceof Error ? e.message : 'Reanalyze all failed', {
+        color: 'error',
+      })
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     snapshot,
     loading,
@@ -74,10 +95,14 @@ export const usePipelineStore = defineStore('pipeline', () => {
     queue,
     tracks,
     workerActive,
+    queueStalled,
+    queueBacklogged,
+    trackSummary,
     lastEvent,
     load,
     rescan,
     runAnalyzeBacklog,
+    runReanalyzeAll,
     applySnapshot,
   }
 })
