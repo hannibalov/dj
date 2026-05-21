@@ -22,3 +22,19 @@ def test_parse_last_peak_from_summary() -> None:
     from app.analysis.loudness import _PEAK_RE
 
     assert _parse_last(_PEAK_RE, _SAMPLE_EBUR128_OUTPUT) == 1.5
+
+
+def test_measure_loudness_on_repo_mp3() -> None:
+    from pathlib import Path
+
+    import pytest
+
+    from app.analysis.loudness import measure_loudness
+
+    repo_root = Path(__file__).resolve().parents[2]
+    samples = list(repo_root.rglob("Wonderwall - Oasis.mp3"))
+    if not samples:
+        pytest.skip("sample mp3 not in repo")
+    lufs, peak = measure_loudness(samples[0])
+    assert lufs is not None and lufs < -6
+    assert peak is not None and 0 < peak < 3

@@ -19,23 +19,35 @@ FORMAT_RANK = {
 
 
 @dataclass(frozen=True)
+class StreamInfo:
+    bitrate_kbps: int | None
+    sample_rate_hz: int | None
+    bits_per_sample: int | None
+
+
+@dataclass(frozen=True)
 class AudioFormatInfo:
     extension: str
     family: str
     format_rank: int
     bitrate_kbps: int | None
+    sample_rate_hz: int | None = None
+    bits_per_sample: int | None = None
 
 
 def get_format_info(path: Path) -> AudioFormatInfo:
     ext = path.suffix.lower()
     family = _format_family(ext)
-    bitrate = _read_bitrate_kbps(path) if ext == MP3_EXTENSION else None
+    stream = _read_stream_info(path)
     rank = FORMAT_RANK.get(ext, 99)
+    bitrate = stream.bitrate_kbps if ext == MP3_EXTENSION else None
     return AudioFormatInfo(
         extension=ext,
         family=family,
         format_rank=rank,
         bitrate_kbps=bitrate,
+        sample_rate_hz=stream.sample_rate_hz,
+        bits_per_sample=stream.bits_per_sample,
     )
 
 
@@ -53,14 +65,24 @@ def _format_family(ext: str) -> str:
     return "other"
 
 
-def _read_bitrate_kbps(path: Path) -> int | None:
+def _read_stream_info(path: Path) -> StreamInfo:
     try:
         audio = MutagenFile(path)
     except Exception:
-        return None
+        return StreamInfo(None, None, None)
     if audio is None or not hasattr(audio, "info") or audio.info is None:
-        return None
-    bitrate = getattr(audio.info, "bitrate", None)
-    if bitrate is None:
-        return None
-    return int(bitrate // 1000)
+        return StreamInfo(None, None, None)
+    info = audio.info
+    bitrate = getattr(info, "bitrate", None)
+    bitrate_kbps = int(bitrate // 1000) if bitrate else None
+    sample_rate = getattr(info, "sample_rate", None)
+    bits_per_sample = getattr(info, "bits_per_sample", None)
+    return StreamInfo(
+        bitrate_kbps=bitrate_kbps,
+        sample_rate_hz=int(sample_rate) if sample_rate else None,
+        bits_per_sample=int(bits_per_sample) if bits_per_sample else None,
+    )
+
+
+def _read_bitrate_kbps(path: Path) -> int | None:
+    return _read_stream_info(path).bitrate_kbps

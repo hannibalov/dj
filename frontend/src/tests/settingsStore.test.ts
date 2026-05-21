@@ -26,7 +26,10 @@ describe('settingsStore', () => {
       tag_confidence_threshold: 0.5,
       naming_template: '{title} - {artist} ({mix}){ext}',
       review_lufs_threshold: -18,
-      review_true_peak_db: -0.1,
+      review_true_peak_db: 3.0,
+      review_min_mp3_bitrate_kbps: 320,
+      review_min_lossless_bit_depth: 16,
+      review_min_lossless_sample_rate_hz: 44100,
     }
     vi.spyOn(settingsService, 'fetchSettings').mockResolvedValue(mockSettings)
 

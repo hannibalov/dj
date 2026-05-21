@@ -20,7 +20,10 @@ class SettingsResponse(FolderSettings):
     tag_confidence_threshold: float = 0.5
     naming_template: str = "{title} - {artist} ({mix}){ext}"
     review_lufs_threshold: float = -18.0
-    review_true_peak_db: float = -0.1
+    review_true_peak_db: float = 3.0
+    review_min_mp3_bitrate_kbps: int = 320
+    review_min_lossless_bit_depth: int = 16
+    review_min_lossless_sample_rate_hz: int = 44100
 
 
 class SettingsUpdate(BaseModel):
@@ -31,3 +34,6 @@ class SettingsUpdate(BaseModel):
     naming_template: str | None = None
     review_lufs_threshold: float | None = None
     review_true_peak_db: float | None = None
+    review_min_mp3_bitrate_kbps: int | None = Field(default=None, ge=0)
+    review_min_lossless_bit_depth: int | None = Field(default=None, ge=0)
+    review_min_lossless_sample_rate_hz: int | None = Field(default=None, ge=0)

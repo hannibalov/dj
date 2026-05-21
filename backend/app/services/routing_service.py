@@ -7,7 +7,7 @@ from app.logging import get_logger
 from app.models.enums import JobStatus, TrackStatus
 from app.models.job import Job
 from app.models.track import Track
-from app.router.rules import needs_review
+from app.router.rules import needs_quality_review_for_path, needs_review
 from app.services.settings_service import SettingsService
 from app.utils.workspace_files import (
     clear_stale_processing_copy,
@@ -66,7 +66,13 @@ class RoutingService:
             lufs_threshold=settings.review_lufs_threshold,
             peak_threshold=settings.review_true_peak_db,
         )
-        review = loudness_review or track.needs_metadata_review
+        quality_review = needs_quality_review_for_path(
+            Path(track.processing_path),
+            min_mp3_bitrate_kbps=settings.review_min_mp3_bitrate_kbps,
+            min_lossless_bit_depth=settings.review_min_lossless_bit_depth,
+            min_lossless_sample_rate_hz=settings.review_min_lossless_sample_rate_hz,
+        )
+        review = loudness_review or quality_review or track.needs_metadata_review
 
         source_file = Path(track.processing_path)
         dest_root = Path(settings.review_folder if review else settings.ready_folder)

@@ -367,13 +367,15 @@ Suggested rules:
 Integrated LUFS < -18
 ```
 
-## Excessive Clipping
+## Excessive peak (review gate)
 
 ```text
-True Peak > -0.1 dB
+True Peak > 3.0 dBTP   (default; configurable in Settings / DJ_REVIEW_TRUE_PEAK_DB)
 ```
 
-Violations:
+Decoded MP3 often reports inter-sample peaks above 0 dBTP without audible distortion. Use a permissive threshold for MP3-heavy libraries; tighten for lossless QC if needed.
+
+Violations (loudness or quality gates):
 → move to REVIEW
 
 ---

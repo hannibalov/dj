@@ -18,6 +18,9 @@ export interface AppSettings extends FolderSettings {
   naming_template: string
   review_lufs_threshold: number
   review_true_peak_db: number
+  review_min_mp3_bitrate_kbps: number
+  review_min_lossless_bit_depth: number
+  review_min_lossless_sample_rate_hz: number
 }
 
 export interface SettingsUpdatePayload {
@@ -28,4 +31,7 @@ export interface SettingsUpdatePayload {
   naming_template?: string
   review_lufs_threshold?: number
   review_true_peak_db?: number
+  review_min_mp3_bitrate_kbps?: number
+  review_min_lossless_bit_depth?: number
+  review_min_lossless_sample_rate_hz?: number
 }

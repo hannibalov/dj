@@ -18,6 +18,8 @@ class Track(Base):
     artist: Mapped[str | None] = mapped_column(String(512), nullable=True)
     title: Mapped[str | None] = mapped_column(String(512), nullable=True)
     album: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    genre: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    subgenre: Mapped[str | None] = mapped_column(String(256), nullable=True)
     mix_version: Mapped[str | None] = mapped_column(String(256), nullable=True)
     musicbrainz_recording_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     tag_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)

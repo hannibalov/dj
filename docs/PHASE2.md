@@ -34,7 +34,7 @@ After ingest (`track.status == ingested`), run analysis and route tracks to `rea
 
 | Area | Location |
 |------|----------|
-| Review rules (LUFS / true peak) | `backend/app/router/rules.py` |
+| Review rules (LUFS / true peak / quality) | `backend/app/router/rules.py` |
 | Route job handler | `backend/app/services/routing_service.py` |
 | Analyze job handler | `backend/app/services/analysis_service.py` |
 | Queue: analyze/route dedup + backlog | `backend/app/services/queue_service.py` |
@@ -44,7 +44,7 @@ After ingest (`track.status == ingested`), run analysis and route tracks to `rea
 
 **After Phase 3:** analyze enqueues `FINGERPRINT` instead of `ROUTE`; routing runs after fingerprint/duplicate resolution. See [PHASE3.md](./PHASE3.md).
 
-**Config:** `DJ_REVIEW_LUFS_THRESHOLD` (default `-18`), `DJ_REVIEW_TRUE_PEAK_DB` (default `-0.1`).
+**Config:** `DJ_REVIEW_LUFS_THRESHOLD` (default `-18`), `DJ_REVIEW_TRUE_PEAK_DB` (default `3.0` dBTP). MP3 inter-sample peaks from ffmpeg `ebur128` commonly exceed 0 dBTP without audible clipping; `-0.1` was too strict for MP3-heavy libraries.
 
 ### Backend — API
 
@@ -63,10 +63,10 @@ After ingest (`track.status == ingested`), run analysis and route tracks to `rea
 | Pipeline stage counts (all tracks in DB) | `frontend/src/components/QueueStatsCard.vue`, `utils/pipelineCounts.ts` |
 | Worker: Processing / Backlogged / Stalled | `frontend/src/components/WorkerStatusCard.vue` |
 | Rescan, Analyze backlog, Reanalyze all | `DashboardPage.vue` |
-| Tracks: BPM, key, energy, **loudness**, artist/title | `frontend/src/components/TracksTable.vue` |
+| Tracks: BPM, key, energy, **loudness**, artist/title, genre/subgenre, format/quality/bitrate (sortable) | `frontend/src/components/TracksTable.vue` |
 | Delete failed track; filter by stage chip | `TracksTable.vue`, `trackService.ts` |
 | Clear failed jobs / Clear failed tracks | `QueueStatsCard.vue`, `WorkerStatusCard.vue` |
-| Loudness helpers (thresholds, labels) | `frontend/src/utils/loudness.ts` |
+| Loudness helpers (thresholds from Settings, labels) | `frontend/src/utils/loudness.ts` |
 | Global snackbars (10s auto-dismiss) | `frontend/src/stores/snackbarStore.ts`, `AppSnackbar.vue` |
 | Pipeline feedback via snackbar | `frontend/src/stores/pipelineStore.ts` |
 | Full-height layout / background | `frontend/src/styles/main.css`, `App.vue` |
@@ -93,8 +93,8 @@ make lint
 | Track status | Meaning |
 |--------------|---------|
 | `ingested` | In `processing/`; analysis may be pending or done |
-| `ready` | Copied to `ready/` after loudness OK |
-| `review` | Copied to `review/` (too quiet or clipped) |
+| `ready` | Copied to `ready/` after loudness, quality, and metadata gates pass |
+| `review` | Copied to `review/` (too quiet, high peak, below min quality, or metadata review) |
 
 | Job types used | `ingest`, `analyze`, `route` |
 
@@ -104,8 +104,10 @@ make lint
 
 - Essentia preinstalled in Docker image (ARM/Pi)
 - Worker CPU/RAM limits enforced during analysis
-- Loudness thresholds editable in Settings UI
+- Duplicate-rule settings UI (see [PHASE6 backlog](./PHASE6.md#backlog-from-earlier-phases))
 - Split “loudness gate” vs “final library route” when Phase 4 adds tagging (Phase 3 added fingerprint + `duplicates/` routing)
+
+**Delivered after Phase 2:** Loudness and quality gate thresholds editable in Settings UI (`LoudnessSettingsForm`, `QualitySettingsForm`).
 
 ---
 

@@ -12,7 +12,14 @@ const baseTrack = {
   artist: null,
   title: null,
   album: null,
+  genre: null,
+  subgenre: null,
   mix_version: null,
+  format_extension: null,
+  audio_family: null,
+  bitrate_kbps: null,
+  sample_rate_hz: null,
+  bits_per_sample: null,
   tag_confidence: null,
   needs_metadata_review: false,
   bpm: null,
@@ -35,10 +42,22 @@ describe('loudness utils', () => {
     ).toBe('quiet')
   })
 
-  it('detects clipping', () => {
+  it('detects high peak above threshold', () => {
     expect(
-      loudnessStatus({ ...baseTrack, integrated_lufs: -12, true_peak_db: 0.2 }),
+      loudnessStatus(
+        { ...baseTrack, integrated_lufs: -12, true_peak_db: 4.0 },
+        { lufs: -18, peak: 3.0 },
+      ),
     ).toBe('clipped')
+  })
+
+  it('passes typical mp3 inter-sample peak', () => {
+    expect(
+      loudnessStatus(
+        { ...baseTrack, integrated_lufs: -8.6, true_peak_db: 1.5 },
+        { lufs: -18, peak: 3.0 },
+      ),
+    ).toBe('ok')
   })
 
   it('formats summary with LUFS and peak', () => {

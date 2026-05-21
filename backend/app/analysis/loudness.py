@@ -15,7 +15,11 @@ def measure_loudness(
     *,
     timeout_seconds: int = 300,
 ) -> tuple[float | None, float | None]:
-    """Return integrated LUFS and true peak (dBFS) via ffmpeg ebur128."""
+    """Return integrated LUFS and true peak (dBTP) via ffmpeg ebur128.
+
+    Decoded MP3/AAC often reports inter-sample peaks above 0 dBTP even when
+    playback sounds clean; use a permissive review threshold for those formats.
+    """
     if not audio_path.is_file():
         return None, None
 

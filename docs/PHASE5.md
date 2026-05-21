@@ -219,7 +219,7 @@ Auto rules in `version_priority.py` remain the **default** until the user resolv
 5a  POST /duplicates/resolve + dashboard Keep/Archive     ← minimum shippable
 5b  Compare panel + waveform endpoint (optional)
 5c  tag-backlog + scheduler retries
-5d  loudness + duplicate settings in UI
+5d  loudness + quality gates in Settings UI (done); duplicate-rule toggle (open)
 ```
 
 ---

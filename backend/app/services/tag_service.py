@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.logging import get_logger
+from app.metadata.genre_resolve import resolve_track_genres
 from app.metadata.matcher import match_track_metadata, needs_metadata_review
 from app.metadata.rename import build_library_filename
 from app.metadata.tags import write_tags
@@ -20,6 +21,12 @@ from app.utils.job_payload import job_payload
 from app.services.settings_service import SettingsService
 
 logger = get_logger("TAGGER")
+
+
+def _genre_for_file_tags(genre: str | None, subgenre: str | None) -> str | None:
+    if genre and subgenre:
+        return f"{genre}; {subgenre}"
+    return genre
 
 
 class TagService:
@@ -70,6 +77,12 @@ class TagService:
         review = needs_metadata_review(match, threshold=threshold)
 
         if match is None:
+            genres = resolve_track_genres(
+                audio_path=audio_path,
+                musicbrainz_recording_id=None,
+            )
+            track.genre = genres.genre
+            track.subgenre = genres.subgenre
             track.needs_metadata_review = True
             track.tag_confidence = 0.0
             track.tagged_at = datetime.now(UTC)
@@ -78,6 +91,12 @@ class TagService:
             logger.info("tag_no_match", source=job.source_path)
             QueueService(self._db).enqueue_route(track.source_path, force=reprocess)
             return
+
+        genres = resolve_track_genres(
+            audio_path=audio_path,
+            musicbrainz_recording_id=match.musicbrainz_recording_id,
+        )
+        file_genre = _genre_for_file_tags(genres.genre, genres.subgenre)
 
         new_name = build_library_filename(
             artist=match.artist,
@@ -99,6 +118,7 @@ class TagService:
                 artist=match.artist,
                 title=match.title,
                 album=match.album,
+                genre=file_genre,
             )
         except Exception as exc:
             job.status = JobStatus.FAILED
@@ -111,6 +131,8 @@ class TagService:
         track.artist = match.artist
         track.title = match.title
         track.album = match.album
+        track.genre = genres.genre
+        track.subgenre = genres.subgenre
         track.mix_version = match.mix_version
         track.musicbrainz_recording_id = match.musicbrainz_recording_id
         track.tag_confidence = match.confidence

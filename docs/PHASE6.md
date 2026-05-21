@@ -30,7 +30,7 @@ Items deferred while shipping core pipeline features. **Not part of Phase 6a** u
 | **5c** | `POST /queue/tag-backlog` | TAG for `tagged_at IS NULL` in `processing/` | 7b |
 | **5c** | Scheduler retries | Re-enqueue `FAILED` jobs with backoff + cap | 7b |
 | **5c** | Failed job retry count in UI | Jobs table column / chip | 7b |
-| **5d** | Loudness thresholds in Settings UI | `DJ_REVIEW_LUFS_THRESHOLD`, `DJ_REVIEW_TRUE_PEAK_DB` today via env only | 7c |
+| **5d** | Loudness thresholds in Settings UI | Done — `LoudnessSettingsForm` + quality gates (`QualitySettingsForm`); env still sets defaults | — |
 | **5d** | Duplicate rule toggle | User-configurable “FLAC + MP3 keep both” vs single keeper | 7c |
 
 ### Cross-phase / spec — still open
@@ -54,7 +54,7 @@ Items deferred while shipping core pipeline features. **Not part of Phase 6a** u
 6a  Docker on Pi (images, compose, README, WS proxy)     ← current
 7a  Duplicate compare panel + waveform (5b)
 7b  Tag backlog + scheduler retries (5c)
-7c  Settings UI for loudness + duplicate rules (5d)
+7c  Duplicate-rule settings UI (5d remainder)
 7d  Essentia on ARM (optional BPM/key in container)
 8+  Logs API, metrics dashboard, Picard/artwork
 ```

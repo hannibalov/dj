@@ -19,7 +19,7 @@
           type="number"
           step="0.1"
           density="compact"
-          hint="True peak above this → review/ (default -0.1)"
+          hint="True peak above this → review/ (default 3.0; MP3 inter-sample peaks are normal below ~3)"
           persistent-hint
         />
       </v-col>

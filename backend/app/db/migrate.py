@@ -50,6 +50,17 @@ def migrate_phase4_columns(engine: Engine) -> None:
     )
 
 
+def migrate_genre_columns(engine: Engine) -> None:
+    _add_columns(
+        engine,
+        "tracks",
+        {
+            "genre": "VARCHAR(256)",
+            "subgenre": "VARCHAR(256)",
+        },
+    )
+
+
 def migrate_phase5_columns(engine: Engine) -> None:
     _add_columns(
         engine,
@@ -65,3 +76,4 @@ def run_migrations(engine: Engine) -> None:
     migrate_tracks_analysis_columns(engine)
     migrate_phase4_columns(engine)
     migrate_phase5_columns(engine)
+    migrate_genre_columns(engine)

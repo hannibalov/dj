@@ -29,3 +29,15 @@ export function deleteFailedTrack(trackId: number): Promise<TrackDeleteResponse>
 export function deleteAllFailedTracks(): Promise<TrackDeleteResponse> {
   return api.post<TrackDeleteResponse>('/tracks/delete-failed')
 }
+
+export interface TrackMetadataUpdate {
+  artist: string
+  title: string
+}
+
+export function updateTrackMetadata(
+  trackId: number,
+  body: TrackMetadataUpdate,
+): Promise<TrackActionResponse> {
+  return api.patch<TrackActionResponse>(`/tracks/${trackId}/metadata`, body)
+}

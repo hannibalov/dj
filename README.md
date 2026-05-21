@@ -134,9 +134,30 @@ Open http://localhost:5173
 | Settings UI | SQLite folder paths (override `.env`; restart watcher if `watch_folder` changes) |
 | `docker-compose.yml` | `/data/...` paths and service limits |
 
-`DJ_ACOUSTID_API_KEY` — tagging without it falls back to embedded tags / filename parsing.
+`DJ_ACOUSTID_API_KEY` — tagging without it falls back to embedded tags / filename parsing. With a key, AcoustID also supplies a MusicBrainz recording ID used for **genre / subgenre** lookup.
 
-`DJ_REVIEW_LUFS_THRESHOLD` / `DJ_REVIEW_TRUE_PEAK_DB` — loudness routing (defaults `-18` LUFS, `-0.1` dBTP).
+**Routing gates** (env defaults; editable in **Settings** and stored in SQLite):
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `DJ_REVIEW_LUFS_THRESHOLD` | `-18` | Integrated LUFS below this → `review/` |
+| `DJ_REVIEW_TRUE_PEAK_DB` | `3.0` | True peak above this (dBTP) → `review/` |
+| `DJ_REVIEW_MIN_MP3_BITRATE_KBPS` | `320` | MP3 below this kbps → `review/` (`0` = off) |
+| `DJ_REVIEW_MIN_LOSSLESS_BIT_DEPTH` | `16` | Lossless below this bit depth → `review/` (`0` = off) |
+| `DJ_REVIEW_MIN_LOSSLESS_SAMPLE_RATE_HZ` | `44100` | Lossless below this sample rate → `review/` (`0` = off) |
+
+True peak uses ffmpeg `ebur128`. Decoded **MP3** often reports inter-sample peaks above 0 dBTP without audible distortion; the default **+3.0 dBTP** gate avoids flagging normal loud masters. Set **`0`** on any quality gate field in Settings to disable that check.
+
+### Settings page
+
+| Section | What it controls |
+|---------|------------------|
+| **Folders** | Watch, processing, ready, review, duplicates, etc. (SQLite overrides `.env`) |
+| **Tagging & naming** | AcoustID confidence threshold, library filename template |
+| **Loudness gates** | LUFS and true-peak thresholds for `review/` routing |
+| **Quality gates** | Min MP3 bitrate, min lossless bit depth / sample rate for `review/` routing |
+
+Restart **watcher** if you change `watch_folder`. Routing gates apply on the next **ROUTE** job (use **Reanalyze all** or per-track **Reset** to re-evaluate existing tracks).
 
 ---
 
@@ -163,7 +184,9 @@ Two different numbers:
 
 Track stages (in order): **Queued** → **Ingesting** → **In pipeline** (`ingested`, waiting on analyze/tag/route) → **Ready** / **Review** / **Duplicate** / **Failed**.
 
-**Artist / title** appear after the **TAG** job completes (not after analyze). Until then the table shows `—` even if loudness/BPM are filled in.
+**Artist / title / genre / subgenre** appear after the **TAG** job completes (not after analyze). Until then those columns show `—` even if loudness/BPM are filled in.
+
+**Format**, **Quality** (bit depth / sample rate for lossless), and **Bitrate** (MP3 kbps) are read from the on-disk file when the dashboard loads (library copy → processing → watch). **Quality** and **Bitrate** are sortable; each column shows data for one format family only (lossless → Quality, MP3 → Bitrate, the other shows `—`).
 
 The tracks table lists up to **500** newest tracks; the header shows **“table shows N newest”** when you have more in the DB.
 
@@ -183,9 +206,19 @@ The tracks table lists up to **500** newest tracks; the header shows **“table 
 
 ### Tracks table
 
-Per-row **Reset** (re-queue ingest). **Delete** on **failed** tracks only. **Approve** on **review** tracks.
+| Column / action | Notes |
+|-----------------|--------|
+| **Artist / Title** | Editable inline — blur or Enter saves via `PATCH /tracks/{id}/metadata`, rewrites file tags, renames in place per naming template, clears metadata-review flag |
+| **Genre / Subgenre** | Filled at TAG: MusicBrainz (when AcoustID returns a recording ID) + embedded `genre` tag fallback |
+| **Format / Quality / Bitrate** | From mutagen on the current audio path (not stored in DB). Quality = lossless bit depth + sample rate; Bitrate = MP3 kbps only |
+| **Loudness** | From ffmpeg `ebur128` at ANALYZE. Badges: **OK**, **Too quiet** (LUFS below gate), **High peak** (true peak above gate). Thresholds match Settings → Loudness gates |
+| **Reset** | Re-queue ingest |
+| **Delete** | **Failed** tracks only |
+| **Approve** | **Review** tracks → `ready/` |
 
 Header **Clear N failed** removes all tracks in `failed` status (files + DB row).
+
+Library filenames use **`Title - Artist (Mix).ext`** — that can look “reversed” compared to watch-folder names (`Artist - Title`), even when artist/title in the table are correct.
 
 ### Duplicate groups
 
@@ -195,12 +228,20 @@ Header **Clear N failed** removes all tracks in `failed` status (files + DB row)
 
 Last **200** jobs in the API snapshot (paginated in the UI). Check **Error** for failures (e.g. missing file, ffmpeg, tagging).
 
+Common TAG errors:
+
+| Error | Cause | Fix |
+|-------|--------|-----|
+| `'artist' not a Frame instance` on **tag** + `.wav` | Old builds used the wrong mutagen API for WAV/AIFF | Upgrade backend image; **Reanalyze all** |
+| Tracks **In pipeline**, worker **idle**, 0 pending | Earlier job failed; chain stopped | **Recent jobs** → fix cause → **Reanalyze all** or per-track **Reset** |
+| **Analyze backlog** enqueues 0 | Backlog only targets `ingested` tracks **without LUFS** | Use **Reanalyze all** for analyzed-but-stuck tracks |
+
 ### Operations checklist
 
 1. **`docker compose ps`** — `worker` must be **Up** (or run `python -m app.workers.main` locally).
-2. After a **backend image upgrade**, run **Reanalyze all** once if you fixed analysis/tagging; keep the worker up until **pending** hits 0.
-3. Many **failed jobs** from an old bug? Fix/deploy, then **Clear failed jobs**. Reset or reanalyze stuck tracks.
-4. Set **`DJ_ACOUSTID_API_KEY`** in `.env` for reliable artist/title via AcoustID; without it, tagging uses filename + embedded tags only.
+2. After a **backend image upgrade**, run **Reanalyze all** once if you fixed analysis/tagging/WAV tags; keep the worker up until **pending** hits 0.
+3. Many **failed jobs** from an old bug? Fix/deploy, then **Clear failed jobs**. Reset or reanalyze stuck tracks (clearing failed jobs alone does not re-queue work).
+4. Set **`DJ_ACOUSTID_API_KEY`** in `.env` for AcoustID artist/title and MusicBrainz genre/subgenre; without it, tagging uses filename + embedded tags only.
 
 ---
 
@@ -209,7 +250,7 @@ Last **200** jobs in the API snapshot (paginated in the UI). Check **Error** for
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | Health check |
-| GET/PUT | `/settings` | Folders + tagging thresholds |
+| GET/PUT | `/settings` | Folders, tagging, loudness gates, quality gates |
 | GET | `/pipeline/status` | Snapshot: queue, tracks (≤500), `track_summary` counts, worker flags |
 | POST | `/queue/rescan` | Scan watch → ingest |
 | POST | `/queue/analyze-backlog` | Analyze ingested tracks without LUFS |
@@ -218,7 +259,8 @@ Last **200** jobs in the API snapshot (paginated in the UI). Check **Error** for
 | POST | `/queue/clear-failed-jobs` | Delete all failed jobs from history |
 | GET | `/duplicates` | Duplicate groups |
 | POST | `/duplicates/resolve` | Keep one copy; archive others |
-| GET | `/tracks` | List tracks (dashboard uses limit 500) |
+| GET | `/tracks` | List tracks (dashboard uses limit 500; includes format/bitrate from files) |
+| PATCH | `/tracks/{id}/metadata` | Manual artist/title override → write tags + rename |
 | POST | `/tracks/{id}/reset` | Reset track; re-enqueue ingest |
 | POST | `/tracks/{id}/confirm-review` | Move review → ready |
 | DELETE | `/tracks/{id}` | Delete track (failed status only) |
@@ -252,7 +294,7 @@ docker compose run --rm db-init
 | Priority | Doc | Topic |
 |----------|-----|--------|
 | **Now** | [PHASE6.md](./docs/PHASE6.md) | Docker on Pi (6a) |
-| Later | PHASE6 backlog | Duplicate compare + waveforms (5b), tag backlog + retries (5c), settings UI (5d) |
+| Later | PHASE6 backlog | Duplicate compare + waveforms (5b), tag backlog + retries (5c), duplicate-rule settings (5d remainder) |
 | Later | — | Essentia on ARM, `GET /logs`, metrics dashboard |
 
 ---

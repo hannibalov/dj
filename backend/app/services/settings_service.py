@@ -28,6 +28,9 @@ class SettingsService:
             naming_template=env.naming_template,
             review_lufs_threshold=env.review_lufs_threshold,
             review_true_peak_db=env.review_true_peak_db,
+            review_min_mp3_bitrate_kbps=env.review_min_mp3_bitrate_kbps,
+            review_min_lossless_bit_depth=env.review_min_lossless_bit_depth,
+            review_min_lossless_sample_rate_hz=env.review_min_lossless_sample_rate_hz,
         )
 
     def _load_overrides(self) -> dict[str, str]:
@@ -55,6 +58,21 @@ class SettingsService:
             self._upsert("review_lufs_threshold", str(payload.review_lufs_threshold))
         if payload.review_true_peak_db is not None:
             self._upsert("review_true_peak_db", str(payload.review_true_peak_db))
+        if payload.review_min_mp3_bitrate_kbps is not None:
+            self._upsert(
+                "review_min_mp3_bitrate_kbps",
+                str(payload.review_min_mp3_bitrate_kbps),
+            )
+        if payload.review_min_lossless_bit_depth is not None:
+            self._upsert(
+                "review_min_lossless_bit_depth",
+                str(payload.review_min_lossless_bit_depth),
+            )
+        if payload.review_min_lossless_sample_rate_hz is not None:
+            self._upsert(
+                "review_min_lossless_sample_rate_hz",
+                str(payload.review_min_lossless_sample_rate_hz),
+            )
         self._db.commit()
         return self.get_all()
 

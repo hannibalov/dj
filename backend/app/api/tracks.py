@@ -4,7 +4,9 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.schemas.track import TrackResponse
 from app.schemas.track_actions import TrackActionResponse, TrackDeleteResponse
+from app.schemas.track_metadata import TrackMetadataUpdate
 from app.services.track_lifecycle_service import TrackLifecycleError, TrackLifecycleService
+from app.services.track_metadata_service import TrackMetadataError, TrackMetadataService
 from app.services.track_service import TrackService
 
 router = APIRouter()
@@ -39,6 +41,27 @@ def get_track(track_id: int, db: Session = Depends(get_db)) -> TrackResponse:
     return track
 
 
+@router.patch("/{track_id}/metadata", response_model=TrackActionResponse)
+def update_track_metadata(
+    track_id: int,
+    body: TrackMetadataUpdate,
+    db: Session = Depends(get_db),
+) -> TrackActionResponse:
+    try:
+        track = TrackMetadataService(db).update_metadata(
+            track_id,
+            artist=body.artist,
+            title=body.title,
+        )
+    except TrackMetadataError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return TrackActionResponse(
+        status="ok",
+        track=TrackService(db)._to_response(track),
+        message="Tags updated",
+    )
+
+
 @router.post("/{track_id}/reset", response_model=TrackActionResponse)
 def reset_track(track_id: int, db: Session = Depends(get_db)) -> TrackActionResponse:
     try:
@@ -47,7 +70,7 @@ def reset_track(track_id: int, db: Session = Depends(get_db)) -> TrackActionResp
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return TrackActionResponse(
         status="ok",
-        track=TrackResponse.model_validate(track),
+        track=TrackService(db)._to_response(track),
         message="Pipeline reset; ingest job enqueued",
     )
 
@@ -69,6 +92,6 @@ def confirm_review(track_id: int, db: Session = Depends(get_db)) -> TrackActionR
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return TrackActionResponse(
         status="ok",
-        track=TrackResponse.model_validate(track),
+        track=TrackService(db)._to_response(track),
         message="Moved to ready; other copies removed",
     )

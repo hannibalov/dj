@@ -20,7 +20,7 @@ Identify duplicate and near-duplicate tracks using audio fingerprints, persist g
 INGEST → ANALYZE → FINGERPRINT → ROUTE
                       ↓
               duplicates/<hash>/  (non-preferred copies)
-              ready/ or review/   (preferred copy, loudness rules)
+              ready/ or review/   (preferred copy, routing gates)
 ```
 
 - `AnalysisService` enqueues `FINGERPRINT` (not `ROUTE`) after analyze
@@ -86,7 +86,7 @@ make lint
 | Track status | Meaning |
 |--------------|---------|
 | `duplicate` | Non-preferred copy in `duplicates/<hash>/` |
-| `ready` / `review` | Preferred copy after loudness routing |
+| `ready` / `review` | Preferred copy after ROUTE (loudness, quality, metadata gates) |
 
 | Job types used | `ingest`, `analyze`, `fingerprint`, `route` |
 

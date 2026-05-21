@@ -104,11 +104,11 @@ cd ~/dj-pipeline
 docker compose pull && docker compose up -d
 ```
 
-Open the dashboard → **Reanalyze all** if a release fixed analysis or tagging and you need to refresh existing tracks. The **worker** service must be running until the job queue is empty.
+Open the dashboard → **Reanalyze all** if a release fixed analysis, tagging, WAV support, or genre lookup and you need to refresh existing tracks. The **worker** service must be running until the job queue is empty.
 
-After upgrading, it is normal to see **Backlogged** with many pending jobs on a Pi — the worker runs **one job at a time** (analyze/ffmpeg is slow). Artist/title fill in at the **TAG** step, not immediately after reanalyze.
+After upgrading, it is normal to see **Backlogged** with many pending jobs on a Pi — the worker runs **one job at a time** (analyze/ffmpeg is slow). Artist/title and genre/subgenre fill in at the **TAG** step, not immediately after reanalyze.
 
-If you accumulated hundreds of **failed jobs** from an older image (e.g. TAG errors), use **Clear failed jobs** on the dashboard after deploying the fix, then **Reset** or **Reanalyze** affected tracks. See [Dashboard](../README.md#dashboard) in the main README.
+If you accumulated **failed jobs** from an older image (e.g. WAV `not a Frame instance` on tag rows), use **Clear failed jobs** after deploying the fix, then **Reanalyze all** (or per-track **Reset**). Clearing failed jobs alone does not re-queue tracks. See [Dashboard troubleshooting](#dashboard-troubleshooting-pi) and [README § Dashboard](../README.md#dashboard).
 
 **Example** (images published as `rodriguescu`):
 
@@ -197,12 +197,18 @@ Tuning compose `mem_limit` / `cpus` is the cleanest approach once **Option A** i
 
 | Symptom | Likely cause | What to do |
 |---------|----------------|------------|
-| All tracks **In pipeline**, no artist/title | TAG not reached yet, or TAG failed | Check **Recent jobs** → errors on `tag` rows. Ensure `DJ_ACOUSTID_API_KEY` is set. Wait for queue or **Reanalyze** after fix. |
-| **Worker idle** but 0 pending | Queue empty; tracks stuck from earlier failures | **Reset** track or **Reanalyze all**; **Clear failed jobs** |
-| **Worker idle**, many **pending** | Misleading label between jobs | Should show **Backlogged** on new UI; confirm `worker` is Up: `docker compose logs worker --tail 30` |
+| All tracks **In pipeline**, no artist/title | TAG not reached yet, or TAG failed | Check **Recent jobs** → errors on `tag` rows. Ensure `DJ_ACOUSTID_API_KEY` is set. Wait for queue or **Reanalyze all** after fix. |
+| TAG fails on **.wav** with `not a Frame instance` | Old image: WAV/AIFF tags need ID3 frames | Pull latest backend image; **Reanalyze all** |
+| **Worker idle** but 0 pending, many **In pipeline** | Queue empty; tracks stuck after earlier failures | **Reanalyze all** or per-track **Reset**; then **Clear failed jobs** |
+| **Analyze backlog** does nothing | Only enqueues tracks with no LUFS yet | Use **Reanalyze all** if BPM/LUFS already filled |
+| **Worker idle**, many **pending** | Normal gap between jobs on Pi | Should show **Backlogged**; confirm `worker` is Up: `docker compose logs worker --tail 30` |
 | **Stalled**, pending > 0, running = 0 | Worker stopped or jobs stuck `running` | `docker compose start worker` or **Retry stalled jobs** |
+| No **genre** / **subgenre** on old tracks | Columns filled at TAG; not retroactive | **Reanalyze all** with `DJ_ACOUSTID_API_KEY` set |
+| Filename looks like title–artist reversed | Library template is `Title - Artist (Mix).ext` by design | Table artist/title are still correct; edit inline if needed |
 | Pipeline shows **100** songs but you have more | Old image capped list at 100 | Upgrade image; chips use full DB counts on current builds |
-| **540 failed jobs** | Historical failures | **Clear failed jobs** after deploying fixes (does not fix tracks by itself) |
+| Many **failed jobs** | Historical failures | **Clear failed jobs** after deploying fixes (does not re-queue tracks) |
+
+See also [README § Dashboard](../README.md#dashboard) for tracks-table columns (format, quality, bitrate, loudness badges, editable metadata) and [Settings page](../README.md#settings-page) for routing gates.
 
 ```bash
 docker compose ps

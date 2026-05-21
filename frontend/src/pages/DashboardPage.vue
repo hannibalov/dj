@@ -69,8 +69,10 @@ import TracksTable from '@/components/TracksTable.vue'
 import WorkerStatusCard from '@/components/WorkerStatusCard.vue'
 import { usePipelineWebSocket } from '@/composables/usePipelineWebSocket'
 import { usePipelineStore } from '@/stores/pipelineStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 
 const pipeline = usePipelineStore()
+const settingsStore = useSettingsStore()
 const trackStatusFilter = ref<TrackStatus | null>(null)
 const wsConnected = ref(false)
 const duplicateGroupsRef = ref<{ load: () => Promise<void> } | null>(null)
@@ -87,6 +89,7 @@ usePipelineWebSocket(
 
 onMounted(() => {
   void pipeline.load()
+  void settingsStore.load()
 })
 
 </script>

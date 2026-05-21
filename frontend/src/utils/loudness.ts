@@ -1,19 +1,32 @@
 import type { Track } from '@/types/track'
 
 /** Match backend defaults (DJ_REVIEW_*). */
-export const REVIEW_LUFS_THRESHOLD = -18
-export const REVIEW_PEAK_THRESHOLD = -0.1
+export const DEFAULT_REVIEW_LUFS_THRESHOLD = -18
+export const DEFAULT_REVIEW_PEAK_THRESHOLD = 3.0
+
+export interface LoudnessThresholds {
+  lufs: number
+  peak: number
+}
+
+export const DEFAULT_LOUDNESS_THRESHOLDS: LoudnessThresholds = {
+  lufs: DEFAULT_REVIEW_LUFS_THRESHOLD,
+  peak: DEFAULT_REVIEW_PEAK_THRESHOLD,
+}
 
 export type LoudnessStatus = 'unknown' | 'ok' | 'quiet' | 'clipped'
 
-export function loudnessStatus(track: Track): LoudnessStatus {
+export function loudnessStatus(
+  track: Track,
+  thresholds: LoudnessThresholds = DEFAULT_LOUDNESS_THRESHOLDS,
+): LoudnessStatus {
   if (track.integrated_lufs == null && track.true_peak_db == null) {
     return 'unknown'
   }
   const quiet =
-    track.integrated_lufs != null && track.integrated_lufs < REVIEW_LUFS_THRESHOLD
+    track.integrated_lufs != null && track.integrated_lufs < thresholds.lufs
   const clipped =
-    track.true_peak_db != null && track.true_peak_db > REVIEW_PEAK_THRESHOLD
+    track.true_peak_db != null && track.true_peak_db > thresholds.peak
   if (clipped) {
     return 'clipped'
   }
@@ -30,7 +43,7 @@ export function loudnessStatusLabel(status: LoudnessStatus): string {
     case 'quiet':
       return 'Too quiet'
     case 'clipped':
-      return 'Clipped'
+      return 'High peak'
     default:
       return 'Not analyzed'
   }

@@ -269,6 +269,8 @@ class TrackLifecycleService:
         track.artist = None
         track.title = None
         track.album = None
+        track.genre = None
+        track.subgenre = None
         track.mix_version = None
         track.musicbrainz_recording_id = None
         track.tag_confidence = None

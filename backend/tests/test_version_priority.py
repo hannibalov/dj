@@ -19,17 +19,19 @@ def test_flac_and_mp3_both_preferred(tmp_path: Path) -> None:
 def test_higher_bitrate_mp3_preferred(tmp_path: Path) -> None:
     from unittest.mock import patch
 
+    from app.utils.audio_format import StreamInfo
+
     low = _track(1, tmp_path / "low.mp3")
     high = _track(2, tmp_path / "high.mp3")
 
-    def fake_bitrate(path: Path) -> int | None:
+    def fake_stream(path: Path) -> StreamInfo:
         if path.name == "low.mp3":
-            return 128
+            return StreamInfo(bitrate_kbps=128, sample_rate_hz=44100, bits_per_sample=None)
         if path.name == "high.mp3":
-            return 320
-        return None
+            return StreamInfo(bitrate_kbps=320, sample_rate_hz=44100, bits_per_sample=None)
+        return StreamInfo(None, None, None)
 
-    with patch("app.utils.audio_format._read_bitrate_kbps", side_effect=fake_bitrate):
+    with patch("app.utils.audio_format._read_stream_info", side_effect=fake_stream):
         assert preferred_track_ids([low, high]) == {2}
 
 

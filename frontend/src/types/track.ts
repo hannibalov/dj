@@ -17,6 +17,8 @@ export interface Track {
   artist: string | null
   title: string | null
   album: string | null
+  genre: string | null
+  subgenre: string | null
   mix_version: string | null
   tag_confidence: number | null
   needs_metadata_review: boolean
@@ -29,6 +31,11 @@ export interface Track {
   key_confidence: number | null
   integrated_lufs: number | null
   true_peak_db: number | null
+  format_extension: string | null
+  audio_family: string | null
+  bitrate_kbps: number | null
+  sample_rate_hz: number | null
+  bits_per_sample: number | null
   created_at: string
   updated_at: string
 }

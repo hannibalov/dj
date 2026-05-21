@@ -4,11 +4,19 @@ from unittest.mock import patch
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.metadata.musicbrainz_lookup import RecordingGenreInfo
 from app.metadata.matcher import MetadataMatch
 from app.models.enums import JobStatus, JobType, TrackStatus
 from app.models.job import Job
 from app.models.track import Track
 from app.services.tag_service import TagService
+
+
+def _mock_genres(genre: str | None = "Electronic", subgenre: str | None = "Techno"):
+    return patch(
+        "app.services.tag_service.resolve_track_genres",
+        return_value=RecordingGenreInfo(genre=genre, subgenre=subgenre),
+    )
 
 
 def _folders(db_session: Session, tmp_path: Path) -> None:
@@ -49,6 +57,7 @@ def test_tag_renames_and_enqueues_route(db_session: Session, tmp_path: Path) -> 
     with (
         patch("app.services.tag_service.match_track_metadata", return_value=match),
         patch("app.services.tag_service.write_tags"),
+        _mock_genres("Alternative Rock", "Britpop"),
     ):
         TagService(db_session).process_tag_job(job)
 
@@ -56,6 +65,8 @@ def test_tag_renames_and_enqueues_route(db_session: Session, tmp_path: Path) -> 
     db_session.refresh(job)
     assert job.status == JobStatus.COMPLETED
     assert track.artist == "Oasis"
+    assert track.genre == "Alternative Rock"
+    assert track.subgenre == "Britpop"
     assert track.title == "Wonderwall"
     assert track.tagged_at is not None
     assert track.needs_metadata_review is False
@@ -103,6 +114,7 @@ def test_tag_low_confidence_sets_metadata_review(db_session: Session, tmp_path: 
     with (
         patch("app.services.tag_service.match_track_metadata", return_value=match),
         patch("app.services.tag_service.write_tags"),
+        _mock_genres(None, None),
     ):
         TagService(db_session).process_tag_job(job)
 
@@ -149,11 +161,14 @@ def test_tag_reprocess_runs_even_when_already_tagged(db_session: Session, tmp_pa
     with (
         patch("app.services.tag_service.match_track_metadata", return_value=match),
         patch("app.services.tag_service.write_tags"),
+        _mock_genres("House", "Deep House"),
     ):
         TagService(db_session).process_tag_job(job)
 
     db_session.refresh(track)
     assert track.artist == "Fresh Artist"
+    assert track.genre == "House"
+    assert track.subgenre == "Deep House"
     assert track.title == "Fresh Title"
 
 

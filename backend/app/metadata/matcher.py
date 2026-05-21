@@ -19,6 +19,8 @@ class MetadataMatch:
     musicbrainz_recording_id: str | None
     confidence: float
     source: str
+    genre: str | None = None
+    subgenre: str | None = None
 
 
 def match_track_metadata(

@@ -28,8 +28,8 @@ watch / POST /queue/rescan
 | Destination | When |
 |-------------|------|
 | `processing/` | After ingest; renamed after TAG |
-| `ready/` / `review/` | Preferred copy; loudness OK and metadata confidence OK |
-| `review/` | Too quiet, clipped, or low-confidence / missing metadata |
+| `ready/` / `review/` | Preferred copy; passes loudness, quality, and metadata gates |
+| `review/` | Too quiet, high peak, below min quality, low-confidence / missing metadata, or manual approval pending |
 | `duplicates/<fingerprint_hash>/` | Non-preferred duplicate (same fingerprint) |
 
 **Filenames in `ready/`:** `Title - Artist (Mix).ext` after Phase 4 TAG job.
@@ -53,6 +53,7 @@ watch / POST /queue/rescan
 | fpcalc (Chromaprint) | 3 | Manual | Yes (`libchromaprint-tools`) |
 | Essentia | 2 (optional) | Manual | Deferred on ARM/Pi |
 | pyacoustid | 4 | pip (`backend`) | Yes |
+| httpx (MusicBrainz genres) | 4 | pip (`backend`) | Yes |
 | AcoustID API key | 4 | `.env` | `.env` / compose |
 
 `install.sh` / `install.py` set up Python, Node, folders, SQLite, and `.env` only.
@@ -63,9 +64,10 @@ watch / POST /queue/rescan
 
 ### Phase 4 (latest)
 
-- **Backend:** `backend/app/metadata/`, `tag_service`, tag columns on `tracks`, `raw_fingerprint` on `fingerprints`
-- **Frontend:** artist/title columns, tagging settings
-- **Tests:** 36 backend + frontend (`make test`)
+- **Backend:** `metadata/` (AcoustID, MusicBrainz genres, WAV/AIFF ID3 tags), `tag_service`, `track_metadata_service`, `genre`/`subgenre` on `tracks`
+- **Frontend:** tracks table — editable artist/title, genre/subgenre, format/quality/bitrate (sortable), loudness badges; Settings — tagging, loudness gates, quality gates
+- **API:** `PATCH /tracks/{id}/metadata`
+- **Tests:** run `make test` for current counts
 
 ### Phase 3
 
@@ -87,5 +89,5 @@ Full table: [PHASE6.md § Backlog from earlier phases](./PHASE6.md#backlog-from-
 |------|--------|
 | Duplicate compare + waveforms | Phase 7a (was 5b) |
 | Tag backlog + scheduler retries | Phase 7b (was 5c) |
-| Loudness / duplicate settings UI | Phase 7c (was 5d) |
+| Loudness / duplicate settings UI | Phase 7c (was 5d) — **loudness + quality gates done**; duplicate-rule toggle still open |
 | Essentia on ARM, Picard/artwork, `GET /logs`, CPU/RAM dashboard | Phase 8+ |

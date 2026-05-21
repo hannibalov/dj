@@ -52,8 +52,20 @@ class Settings(BaseSettings):
         description="Integrated LUFS below this → review folder",
     )
     review_true_peak_db: float = Field(
-        default=-0.1,
-        description="True peak above this (dBFS) → review folder",
+        default=3.0,
+        description="True peak above this (dBTP) → review folder",
+    )
+    review_min_mp3_bitrate_kbps: int = Field(
+        default=320,
+        description="MP3 below this kbps → review folder (0 = disabled)",
+    )
+    review_min_lossless_bit_depth: int = Field(
+        default=16,
+        description="Lossless below this bit depth → review folder (0 = disabled)",
+    )
+    review_min_lossless_sample_rate_hz: int = Field(
+        default=44100,
+        description="Lossless below this sample rate → review folder (0 = disabled)",
     )
 
     acoustid_api_key: str | None = Field(

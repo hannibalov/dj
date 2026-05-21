@@ -14,6 +14,8 @@ class TrackResponse(BaseModel):
     artist: str | None
     title: str | None
     album: str | None
+    genre: str | None = None
+    subgenre: str | None = None
     mix_version: str | None
     musicbrainz_recording_id: str | None
     tag_confidence: float | None
@@ -28,6 +30,11 @@ class TrackResponse(BaseModel):
     key_confidence: float | None
     integrated_lufs: float | None
     true_peak_db: float | None
+    format_extension: str | None = None
+    audio_family: str | None = None
+    bitrate_kbps: int | None = None
+    sample_rate_hz: int | None = None
+    bits_per_sample: int | None = None
     created_at: datetime
     updated_at: datetime
 
