@@ -108,7 +108,13 @@ class FingerprintService:
             select(DuplicateGroup).where(DuplicateGroup.fingerprint_hash == fingerprint_hash)
         ).scalar_one_or_none()
 
-    def _route_to_duplicates_folder(self, track: Track, fingerprint_hash: str) -> None:
+    def route_to_duplicates_folder(
+        self,
+        track: Track,
+        fingerprint_hash: str,
+        *,
+        target_name: str | None = None,
+    ) -> None:
         if (
             track.status == TrackStatus.DUPLICATE
             and track.final_path
@@ -121,7 +127,8 @@ class FingerprintService:
             self._db.commit()
             return
 
-        if not track.processing_path or not Path(track.processing_path).is_file():
+        audio = self._audio_file(track)
+        if audio is None:
             track.status = TrackStatus.FAILED
             self._db.commit()
             return
@@ -129,12 +136,13 @@ class FingerprintService:
         settings = SettingsService(self._db).get_all()
         dup_root = Path(settings.duplicates_folder) / fingerprint_hash
         dup_root.mkdir(parents=True, exist_ok=True)
-        source_file = Path(track.processing_path)
-        dest = dup_root / source_file.name
+        dest = dup_root / (target_name or audio.name)
         if dest.exists() and track.final_path != str(dest):
-            dest = dup_root / f"{source_file.stem}_{track.id}{source_file.suffix}"
+            stem = Path(target_name).stem if target_name else audio.stem
+            suffix = Path(target_name).suffix if target_name else audio.suffix
+            dest = dup_root / f"{stem}_{track.id}{suffix}"
 
-        dest = move_into_destination(source_file, dest)
+        dest = move_into_destination(audio, dest)
         track.final_path = str(dest)
         track.processing_path = None
         track.status = TrackStatus.DUPLICATE
@@ -144,6 +152,18 @@ class FingerprintService:
             source=track.source_path,
             dest=str(dest),
         )
+
+    def _audio_file(self, track: Track) -> Path | None:
+        for path_str in (track.processing_path, track.final_path):
+            if not path_str:
+                continue
+            path = Path(path_str)
+            if path.is_file():
+                return path
+        return None
+
+    def _route_to_duplicates_folder(self, track: Track, fingerprint_hash: str) -> None:
+        self.route_to_duplicates_folder(track, fingerprint_hash)
 
     def _get_or_create_group(self, fingerprint_hash: str) -> DuplicateGroup:
         group = self._db.execute(

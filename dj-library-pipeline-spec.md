@@ -720,6 +720,17 @@ Research tasks:
 
 ---
 
+## MusicBrainz community metadata (exploratory)
+
+When the user **Approves** a review track with corrected artist/title, future versions may:
+
+- Link to the MusicBrainz recording page (`musicbrainz_recording_id` is stored when search or AcoustID finds a match)
+- Optionally submit tag/genre votes via the MusicBrainz editor API (requires user editor credentials — not read-only)
+
+This complements the current **read-only** MusicBrainz integration at TAG and Approve (artist/title search, genre lookup). Implementation deferred.
+
+---
+
 # Long-Term Ideas
 
 ## Smart Playlist Generator

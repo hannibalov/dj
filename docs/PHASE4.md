@@ -8,7 +8,7 @@
 
 ## Goal
 
-Enrich track metadata via AcoustID (and embedded tags / filename fallback), **rename files** to a consistent DJ library convention, write tags (artist, title, album, genre), resolve **genre / subgenre** (MusicBrainz + embedded tags), then route clean copies to `ready/` for Rekordbox import.
+Enrich track metadata via AcoustID (and embedded tags / filename / **MusicBrainz text search** fallback), **rename files** to a consistent DJ library convention, write tags (artist, title, album, genre), resolve **genre / subgenre** (MusicBrainz + embedded tags), then route clean copies to `ready/` for Rekordbox import.
 
 This is the phase that answers: *“Why is my file still named `Wonderwall - Oasis.mp3` in `ready/`?”* — **renaming happens here, not in Phase 2 or 3.**
 
@@ -39,9 +39,13 @@ INGEST → ANALYZE → FINGERPRINT → TAG → ROUTE
 | MusicBrainz genre/tags | `backend/app/metadata/musicbrainz_lookup.py` |
 | Genre resolve (MB + embedded) | `backend/app/metadata/genre_resolve.py` |
 | Match orchestration | `backend/app/metadata/matcher.py` |
+| Pipeline step (API) | `backend/app/utils/pipeline_stage.py` |
 | Job handler | `backend/app/services/tag_service.py` |
 | Manual metadata override | `backend/app/services/track_metadata_service.py` |
+| Review approve + genre backfill | `backend/app/services/track_lifecycle_service.py` |
 | WAV/AIFF ID3 tag I/O | `backend/app/metadata/tags.py` (`TCON`, `TPE1`, `TIT2`, …) |
+
+**API field added:** `pipeline_stage` on each track (derived; not a DB column) — granular in-progress step for the dashboard.
 
 **Track columns added:** `album`, `mix_version`, `musicbrainz_recording_id`, `tag_confidence`, `needs_metadata_review`, `tagged_at`, `genre`, `subgenre`
 
@@ -70,17 +74,48 @@ ID3 tags still store `artist` and `title` fields separately; only the **filename
 
 | Feature | Location |
 |---------|----------|
-| Artist / title (editable → `PATCH /tracks/{id}/metadata`) | `TracksTable.vue`, `trackService.ts` |
+| Artist / title (editable → `PATCH /tracks/{id}/metadata`; renames file per naming template) | `TracksTable.vue`, `trackService.ts` |
 | Genre / subgenre (read-only; set at TAG) | `TracksTable.vue` |
+| **Pipeline step chips** (awaiting analyze, analyzed, awaiting tag, …) | `QueueStatsCard.vue`, `utils/pipelineStage.ts` |
 | Format / quality / bitrate (from file via API; sortable columns) | `TracksTable.vue`, `utils/audioQuality.ts` |
 | Loudness badges (OK / Too quiet / High peak; thresholds from Settings) | `TracksTable.vue`, `utils/loudness.ts` |
 | Metadata review chip | `TracksTable.vue` |
 | Tagging settings | `TagSettingsForm.vue`, `SettingsPage.vue` |
 | Loudness + quality gate settings | `LoudnessSettingsForm.vue`, `QualitySettingsForm.vue`, `SettingsPage.vue` |
 
+### Metadata matching (TAG step)
+
+Priority order for **artist / title**:
+
+1. **AcoustID** fingerprint lookup (requires `DJ_ACOUSTID_API_KEY` + Chromaprint fingerprint).
+2. **Embedded tags** (ID3/Vorbis), with YouTube-style junk normalized (`backend/app/metadata/normalize.py`).
+3. **Filename** from the watch-folder drop or processing basename (`Title - Artist` or `Artist - Title`).
+4. **MusicBrainz text search** — when the best match is **below** the confidence threshold (Settings) and the filename parses to artist + title. Uses the original watch filename when available; optional duration match picks the closest recording. Source: `musicbrainz_search`.
+
+Low-confidence or no match sets `needs_metadata_review` and routes to `review/` even when loudness/quality are OK.
+
 ### Genre / subgenre (TAG step)
 
-1. If AcoustID returns a MusicBrainz recording ID → `GET /recording/{id}?inc=genres+tags` (1 req/s; worker is sequential).
+Genre does **not** require AcoustID. Sources (in order):
+
+1. **MusicBrainz** — recording ID from AcoustID, or **artist/title search** (same query as metadata fallback).
+2. **Embedded** `genre` tag in the file (`Genre; Subgenre` split when compound).
+
+On **Approve** (`POST /tracks/{id}/confirm-review`), missing genre/subgenre is fetched again from MusicBrainz and written to the file before moving to `ready/`.
+
+MusicBrainz requests are sequential (1 req/s); fine with a single worker.
+
+Implementation:
+
+| Area | Location |
+|------|----------|
+| MB recording search | `backend/app/metadata/musicbrainz_lookup.py` (`search_recording_match`) |
+| Genre resolve | `backend/app/metadata/genre_resolve.py` |
+| Matcher + MB fallback | `backend/app/metadata/matcher.py` |
+
+Details:
+
+1. `GET /recording/{id}?inc=genres+tags` when a recording ID is known.
 2. **Genre** — top MusicBrainz genre, else top tag, else embedded `genre` tag.
 3. **Subgenre** — more specific MusicBrainz tag (e.g. `Techno` → `Minimal Techno`), else second part of embedded `Genre; Subgenre`.
 4. Written to DB and to the file genre tag as `Genre; Subgenre` when both exist.
@@ -100,32 +135,56 @@ make lint
 
 ---
 
-## API (metadata)
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| PATCH | `/tracks/{id}/metadata` | Body: `{ "artist", "title" }` — write tags, rename file, set `tagged_at` |
-
 ## Track & job lifecycle (Phase 4)
 
 | Job types used | `ingest`, `analyze`, `fingerprint`, `tag`, `route` |
 
+### Dashboard pipeline steps (`pipeline_stage`)
+
+Terminal statuses mirror `TrackStatus`. While `status` is `ingested`, the API exposes the **next worker step**:
+
+| `pipeline_stage` | UI label | Meaning |
+|------------------|----------|---------|
+| `queued` | Queued | Waiting for ingest |
+| `ingesting` | Ingesting | Copying into `processing/` |
+| `awaiting_analyze` | Awaiting analyze | Ingested; LUFS/BPM not done yet |
+| `awaiting_fingerprint` | Analyzed | Analyze done; fingerprint job next |
+| `awaiting_tag` | Awaiting tag | Fingerprint done (or reused); tag job next |
+| `awaiting_route` | Awaiting route | Tagged; route job next |
+| `ready` / `review` / `duplicate` / `failed` / `archived` | (same) | Terminal |
+
+`track_summary.by_pipeline_stage` drives the dashboard chips (full DB counts, not limited to the tracks table).
+
 | Track field | Meaning |
 |-------------|---------|
-| `genre` / `subgenre` | Set at TAG (MusicBrainz + embedded); shown in dashboard |
+| `genre` / `subgenre` | Set at TAG (MusicBrainz search and/or embedded); backfill on **Approve** if still empty |
+| `musicbrainz_recording_id` | From AcoustID or MusicBrainz artist/title search |
 | `needs_metadata_review` | Tag confidence below threshold or no match |
 | `tagged_at` | Tag job completed (idempotent skip) |
 
 ---
 
+## API (metadata & review)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| PATCH | `/tracks/{id}/metadata` | Body: `{ "artist", "title" }` — write tags, rename file, set `tagged_at` |
+| POST | `/tracks/{id}/confirm-review` | Approve `review/` → `ready/`; optional MusicBrainz genre backfill |
+
+---
+
 ## Operational notes
 
-### AcoustID API key
+### AcoustID API key (recommended)
 
 1. Register at https://acoustid.org/new-application
 2. Set `DJ_ACOUSTID_API_KEY` in `.env`
 
-Without a key, tagging uses embedded ID3/Vorbis tags and filename parsing (`Title - Artist` or `Artist - Title`). **Genre/subgenre** from MusicBrainz require a key and a successful AcoustID match.
+**Without a key:** tagging uses embedded tags, filename parsing, and **MusicBrainz text search** (artist/title from filename) for genre and for low-confidence metadata upgrades.
+
+**With a key:** AcoustID fingerprint match is preferred; MusicBrainz recording ID and genres follow from the match when score is high enough.
+
+Worker needs outbound HTTPS to `api.acoustid.org` and `musicbrainz.org`.
 
 ### Try renaming
 
@@ -147,8 +206,9 @@ Restart **API**, **worker**, **watcher**, and **frontend** after code changes.
 
 - MusicBrainz Picard CLI in Docker (pyacoustid used instead; Python orchestrates pipeline)
 - Artwork embed from Cover Art Archive
+- **MusicBrainz editor integration** — submit corrected tags/genres when approving review tracks (requires MB editor account; exploratory)
 - Manual duplicate resolution — [PHASE5.md](./PHASE5.md)
-- Backlog `POST /queue/tag-backlog` — Phase 5c in [PHASE5.md](./PHASE5.md)
+- Backlog `POST /queue/tag-backlog` — Phase 7b in [PHASE6.md](./PHASE6.md)
 
 ---
 
@@ -159,7 +219,8 @@ Restart **API**, **worker**, **watcher**, and **frontend** after code changes.
 - [x] Renamed file in `ready/` uses `Title - Artist (Mix).ext`
 - [x] Low-confidence / no-match tracks route to `review/` when flagged
 - [x] Settings UI: naming template + confidence threshold
-- [x] Genre/subgenre via MusicBrainz; WAV/AIFF ID3 tagging; editable artist/title; format/quality/bitrate in UI; loudness + quality gates in Settings
+- [x] Genre/subgenre via MusicBrainz search + embedded tags; MB fallback on low-confidence filename matches; genre backfill on Approve
+- [x] Dashboard pipeline step chips (`pipeline_stage`); WAV/AIFF ID3 tagging; editable artist/title; format/quality/bitrate in UI; loudness + quality gates in Settings
 - [x] Docs updated: PHASE4, README, deploy troubleshooting
 
 ---

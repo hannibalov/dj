@@ -17,14 +17,15 @@ Identify duplicate and near-duplicate tracks using audio fingerprints, persist g
 ### Pipeline chain
 
 ```text
-INGEST → ANALYZE → FINGERPRINT → ROUTE
+INGEST → ANALYZE → FINGERPRINT → TAG → ROUTE
                       ↓
               duplicates/<hash>/  (non-preferred copies)
               ready/ or review/   (preferred copy, routing gates)
 ```
 
 - `AnalysisService` enqueues `FINGERPRINT` (not `ROUTE`) after analyze
-- `FingerprintService` runs Chromaprint via `fpcalc`, stores hash, resolves duplicates, then enqueues `ROUTE` for preferred copies only
+- `FingerprintService` runs Chromaprint via `fpcalc`, stores hash, resolves duplicates, then enqueues **`TAG`** for preferred copies ([PHASE4.md](./PHASE4.md))
+- Full chain through rename and routing is documented in Phase 4
 
 ### Backend — fingerprinting
 
@@ -88,7 +89,7 @@ make lint
 | `duplicate` | Non-preferred copy in `duplicates/<hash>/` |
 | `ready` / `review` | Preferred copy after ROUTE (loudness, quality, metadata gates) |
 
-| Job types used | `ingest`, `analyze`, `fingerprint`, `route` |
+| Job types used | `ingest`, `analyze`, `fingerprint`, `tag`, `route` (see [PHASE4.md](./PHASE4.md)) |
 
 ---
 

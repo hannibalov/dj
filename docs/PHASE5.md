@@ -29,7 +29,7 @@ INGEST → ANALYZE → FINGERPRINT → TAG → ROUTE
 
 | Area | Notes |
 |------|--------|
-| `GET /duplicates` | Lists groups with 2+ members (format, bitrate, status) |
+| `GET /duplicates` | Lists **unresolved** groups with 2+ active (non-archived) members |
 | `POST /duplicates/resolve` | Manual keep + archive; persists `preferred_track_id` |
 | `DuplicateGroupsCard.vue` | Keep + archive dialog on dashboard |
 | `duplicate_groups` + `fingerprints` tables | Grouping by fingerprint hash |
@@ -250,6 +250,24 @@ Auto rules in `version_priority.py` remain the **default** until the user resolv
 ---
 
 ## Operational notes
+
+### Metadata edits and duplicates
+
+Editing **artist / title** in the tracks table (`PATCH /tracks/{id}/metadata`):
+
+1. Writes ID3 tags to the on-disk file.
+2. Renames the file using the **naming template** from Settings (same as the TAG step).
+3. If the standard library name already exists for another track with the **same fingerprint and format family**, the edited copy is moved to `duplicates/<hash>/` and its status becomes `duplicate` — so correcting metadata can surface a duplicate you only noticed after naming.
+4. FLAC + MP3 pairs are kept separate (same fingerprint, different format families).
+
+### Duplicate list visibility
+
+`GET /duplicates` returns only groups where:
+
+- `resolved_at` is null (user has not confirmed **Keep** yet), and
+- at least two **non-archived** members remain.
+
+After you resolve a conflict, the group disappears from the dashboard card.
 
 ### Try duplicate resolution
 

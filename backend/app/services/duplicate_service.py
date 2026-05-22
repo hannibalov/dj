@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.duplicate_group import DuplicateGroup
+from app.models.enums import TrackStatus
 from app.models.fingerprint import Fingerprint
 from app.models.track import Track
 from app.schemas.duplicate import DuplicateGroupMember, DuplicateGroupResponse
@@ -16,19 +17,26 @@ class DuplicateService:
 
     def list_groups(self) -> list[DuplicateGroupResponse]:
         groups = (
-            self._db.execute(select(DuplicateGroup).order_by(DuplicateGroup.id)).scalars().all()
+            self._db.execute(
+                select(DuplicateGroup)
+                .where(DuplicateGroup.resolved_at.is_(None))
+                .order_by(DuplicateGroup.id)
+            )
+            .scalars()
+            .all()
         )
         result: list[DuplicateGroupResponse] = []
         for group in groups:
             members = self._members_for_group(group)
-            if len(members) < 2:
+            active_members = [m for m in members if m.status != TrackStatus.ARCHIVED]
+            if len(active_members) < 2:
                 continue
             result.append(
                 DuplicateGroupResponse(
                     id=group.id,
                     fingerprint_hash=group.fingerprint_hash,
                     preferred_track_id=group.preferred_track_id,
-                    members=members,
+                    members=active_members,
                 )
             )
         return result

@@ -170,8 +170,7 @@ function lufsLabel(member: DuplicateGroupMember): string {
 
 function groupTitle(group: DuplicateGroup): string {
   const short = group.fingerprint_hash.slice(0, 12)
-  const resolved = group.preferred_track_id != null ? ' · resolved' : ''
-  return `${group.members.length} tracks · ${short}…${resolved}`
+  return `${group.members.length} tracks · ${short}…`
 }
 
 function openKeepDialog(group: DuplicateGroup, member: DuplicateGroupMember): void {

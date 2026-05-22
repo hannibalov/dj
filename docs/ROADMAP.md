@@ -34,6 +34,10 @@ watch / POST /queue/rescan
 
 **Filenames in `ready/`:** `Title - Artist (Mix).ext` after Phase 4 TAG job.
 
+### Dashboard pipeline steps
+
+The API exposes `pipeline_stage` on each track and `by_pipeline_stage` in `track_summary`. See [PHASE4.md § Dashboard pipeline steps](./PHASE4.md#dashboard-pipeline-steps-pipeline_stage) for the full table (Awaiting analyze → Analyzed → Awaiting tag → …).
+
 ---
 
 ## Dashboard & operations
@@ -53,7 +57,7 @@ watch / POST /queue/rescan
 | fpcalc (Chromaprint) | 3 | Manual | Yes (`libchromaprint-tools`) |
 | Essentia | 2 (optional) | Manual | Deferred on ARM/Pi |
 | pyacoustid | 4 | pip (`backend`) | Yes |
-| httpx (MusicBrainz genres) | 4 | pip (`backend`) | Yes |
+| httpx (MusicBrainz search + genres) | 4 | pip (`backend`) | Yes |
 | AcoustID API key | 4 | `.env` | `.env` / compose |
 
 `install.sh` / `install.py` set up Python, Node, folders, SQLite, and `.env` only.
@@ -62,11 +66,11 @@ watch / POST /queue/rescan
 
 ## Phase snapshots
 
-### Phase 4 (latest)
+### Phase 4 (metadata & dashboard)
 
-- **Backend:** `metadata/` (AcoustID, MusicBrainz genres, WAV/AIFF ID3 tags), `tag_service`, `track_metadata_service`, `genre`/`subgenre` on `tracks`
-- **Frontend:** tracks table — editable artist/title, genre/subgenre, format/quality/bitrate (sortable), loudness badges; Settings — tagging, loudness gates, quality gates
-- **API:** `PATCH /tracks/{id}/metadata`
+- **Backend:** `metadata/` (AcoustID, MusicBrainz search + genres, WAV/AIFF ID3 tags), `tag_service`, `track_metadata_service`, `track_lifecycle_service` (approve + genre backfill), `pipeline_stage` on track responses
+- **Frontend:** tracks table — editable artist/title, genre/subgenre, **pipeline step chips**, format/quality/bitrate (sortable), loudness badges; Settings — tagging, loudness gates, quality gates
+- **API:** `PATCH /tracks/{id}/metadata`, `POST /tracks/{id}/confirm-review`; `pipeline_stage` + `by_pipeline_stage` on pipeline snapshot
 - **Tests:** run `make test` for current counts
 
 ### Phase 3
@@ -90,4 +94,4 @@ Full table: [PHASE6.md § Backlog from earlier phases](./PHASE6.md#backlog-from-
 | Duplicate compare + waveforms | Phase 7a (was 5b) |
 | Tag backlog + scheduler retries | Phase 7b (was 5c) |
 | Loudness / duplicate settings UI | Phase 7c (was 5d) — **loudness + quality gates done**; duplicate-rule toggle still open |
-| Essentia on ARM, Picard/artwork, `GET /logs`, CPU/RAM dashboard | Phase 8+ |
+| Essentia on ARM, Picard/artwork, MusicBrainz editor submit on Approve, `GET /logs`, CPU/RAM dashboard | Phase 8+ |

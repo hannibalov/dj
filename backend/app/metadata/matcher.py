@@ -5,6 +5,7 @@ from pathlib import Path
 
 from app.metadata.acoustid_lookup import AcoustIdMatch, lookup_by_fingerprint
 from app.metadata.artist_title import embedded_tags_swapped
+from app.metadata.musicbrainz_lookup import RecordingSearchMatch, search_recording_match
 from app.metadata.normalize import normalize_embedded_tags
 from app.metadata.tags import parse_filename_metadata, read_tags
 from app.metadata.types import FileTags
@@ -112,6 +113,15 @@ def match_track_metadata(
     if not candidates:
         return None
 
+    best = max(candidates, key=lambda c: c.confidence)
+    if _should_search_musicbrainz(best, threshold=confidence_threshold, parsed=parsed):
+        mb_match = _match_from_musicbrainz_search(
+            parsed,
+            duration_seconds=duration_seconds,
+        )
+        if mb_match is not None:
+            candidates.append(mb_match)
+
     return max(candidates, key=lambda c: c.confidence)
 
 
@@ -146,3 +156,60 @@ def _from_acoustid(acoustid: AcoustIdMatch) -> MetadataMatch:
         confidence=acoustid.score,
         source="acoustid",
     )
+
+
+def _should_search_musicbrainz(
+    best: MetadataMatch,
+    *,
+    threshold: float,
+    parsed: FileTags,
+) -> bool:
+    """Use MusicBrainz text search when filename hints exist but confidence is low."""
+    if not parsed.artist or not parsed.title:
+        return False
+    if best.confidence >= threshold:
+        return False
+    return True
+
+
+def _match_from_musicbrainz_search(
+    parsed: FileTags,
+    *,
+    duration_seconds: float | None,
+) -> MetadataMatch | None:
+    assert parsed.artist and parsed.title
+    hit = search_recording_match(
+        parsed.artist,
+        parsed.title,
+        duration_seconds=duration_seconds,
+    )
+    if hit is None:
+        return None
+    return MetadataMatch(
+        artist=hit.artist,
+        title=hit.title,
+        album=None,
+        mix_version=None,
+        musicbrainz_recording_id=hit.musicbrainz_recording_id,
+        confidence=_musicbrainz_search_confidence(hit, duration_seconds=duration_seconds),
+        source="musicbrainz_search",
+    )
+
+
+def _musicbrainz_search_confidence(
+    hit: RecordingSearchMatch,
+    *,
+    duration_seconds: float | None,
+) -> float:
+    confidence = 0.88
+    if duration_seconds is None or hit.length_ms is None:
+        return confidence
+
+    delta_seconds = abs(hit.length_ms / 1000 - duration_seconds)
+    if delta_seconds <= 5:
+        return 0.93
+    if delta_seconds <= 15:
+        return 0.9
+    if delta_seconds > 45:
+        return 0.78
+    return confidence

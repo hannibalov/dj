@@ -134,7 +134,7 @@ Open http://localhost:5173
 | Settings UI | SQLite folder paths (override `.env`; restart watcher if `watch_folder` changes) |
 | `docker-compose.yml` | `/data/...` paths and service limits |
 
-`DJ_ACOUSTID_API_KEY` — tagging without it falls back to embedded tags / filename parsing. With a key, AcoustID also supplies a MusicBrainz recording ID used for **genre / subgenre** lookup.
+`DJ_ACOUSTID_API_KEY` — **recommended** for fingerprint-based artist/title. Without it, tagging uses embedded tags, filename parsing, and **MusicBrainz text search** (artist/title from the watch filename) for metadata and genre. Worker needs HTTPS to `musicbrainz.org` (always) and `api.acoustid.org` (when key is set).
 
 **Routing gates** (env defaults; editable in **Settings** and stored in SQLite):
 
@@ -179,12 +179,14 @@ Two different numbers:
 
 | UI area | Meaning |
 |---------|---------|
-| **Songs by stage** (chips) | **Track** status in the database — counts **all** tracks (not limited to the table). Click a chip to filter the tracks table. |
+| **Songs by pipeline step** (chips) | **Track** progress in the database — counts **all** tracks via `by_pipeline_stage` (e.g. Awaiting analyze, Analyzed, Awaiting tag). Click a chip to filter the tracks table. |
 | **Background jobs** | **Job** queue: pending / running / failed / completed. The worker drains **one job at a time**. |
 
-Track stages (in order): **Queued** → **Ingesting** → **In pipeline** (`ingested`, waiting on analyze/tag/route) → **Ready** / **Review** / **Duplicate** / **Failed**.
+Pipeline steps (worker order): **Queued** → **Ingesting** → **Awaiting analyze** → **Analyzed** → **Awaiting tag** → **Awaiting route** → **Ready** / **Review** / **Duplicate** / **Failed**.
 
-**Artist / title / genre / subgenre** appear after the **TAG** job completes (not after analyze). Until then those columns show `—` even if loudness/BPM are filled in.
+After **Reanalyze all**, most tracks show **Awaiting analyze** until the worker reaches them; steps advance one job at a time (slow on a Pi with hundreds of tracks).
+
+**Artist / title / genre / subgenre** appear after the **TAG** job (or on **Approve** for genre backfill). Until then those columns may show `—` even if loudness/BPM are filled in.
 
 **Format**, **Quality** (bit depth / sample rate for lossless), and **Bitrate** (MP3 kbps) are read from the on-disk file when the dashboard loads (library copy → processing → watch). **Quality** and **Bitrate** are sortable; each column shows data for one format family only (lossless → Quality, MP3 → Bitrate, the other shows `—`).
 
@@ -209,12 +211,12 @@ The tracks table lists up to **500** newest tracks; the header shows **“table 
 | Column / action | Notes |
 |-----------------|--------|
 | **Artist / Title** | Editable inline — blur or Enter saves via `PATCH /tracks/{id}/metadata`, rewrites file tags, renames in place per naming template, clears metadata-review flag |
-| **Genre / Subgenre** | Filled at TAG: MusicBrainz (when AcoustID returns a recording ID) + embedded `genre` tag fallback |
+| **Genre / Subgenre** | Filled at TAG via MusicBrainz (AcoustID ID or **artist/title search** from filename) + embedded tag fallback; **Approve** backfills if still empty |
 | **Format / Quality / Bitrate** | From mutagen on the current audio path (not stored in DB). Quality = lossless bit depth + sample rate; Bitrate = MP3 kbps only |
 | **Loudness** | From ffmpeg `ebur128` at ANALYZE. Badges: **OK**, **Too quiet** (LUFS below gate), **High peak** (true peak above gate). Thresholds match Settings → Loudness gates |
 | **Reset** | Re-queue ingest |
 | **Delete** | **Failed** tracks only |
-| **Approve** | **Review** tracks → `ready/` |
+| **Approve** | **Review** tracks → `ready/`; tries MusicBrainz genre lookup if missing |
 
 Header **Clear N failed** removes all tracks in `failed` status (files + DB row).
 
@@ -233,15 +235,16 @@ Common TAG errors:
 | Error | Cause | Fix |
 |-------|--------|-----|
 | `'artist' not a Frame instance` on **tag** + `.wav` | Old builds used the wrong mutagen API for WAV/AIFF | Upgrade backend image; **Reanalyze all** |
-| Tracks **In pipeline**, worker **idle**, 0 pending | Earlier job failed; chain stopped | **Recent jobs** → fix cause → **Reanalyze all** or per-track **Reset** |
+| Tracks stuck on **Awaiting analyze**, worker **idle**, 0 pending | Earlier job failed; chain stopped | **Recent jobs** → fix cause → **Reanalyze all** or per-track **Reset** |
 | **Analyze backlog** enqueues 0 | Backlog only targets `ingested` tracks **without LUFS** | Use **Reanalyze all** for analyzed-but-stuck tracks |
+| No **genre** / **subgenre** | Empty embedded tags; old image before MB search | Upgrade backend; **Reanalyze all** or **Approve** review tracks |
 
 ### Operations checklist
 
 1. **`docker compose ps`** — `worker` must be **Up** (or run `python -m app.workers.main` locally).
 2. After a **backend image upgrade**, run **Reanalyze all** once if you fixed analysis/tagging/WAV tags; keep the worker up until **pending** hits 0.
 3. Many **failed jobs** from an old bug? Fix/deploy, then **Clear failed jobs**. Reset or reanalyze stuck tracks (clearing failed jobs alone does not re-queue work).
-4. Set **`DJ_ACOUSTID_API_KEY`** in `.env` for AcoustID artist/title and MusicBrainz genre/subgenre; without it, tagging uses filename + embedded tags only.
+4. Set **`DJ_ACOUSTID_API_KEY`** for best artist/title (fingerprint). Genre and low-confidence upgrades also use **MusicBrainz search** without a key (needs outbound HTTPS).
 
 ---
 
@@ -259,7 +262,7 @@ Common TAG errors:
 | POST | `/queue/clear-failed-jobs` | Delete all failed jobs from history |
 | GET | `/duplicates` | Duplicate groups |
 | POST | `/duplicates/resolve` | Keep one copy; archive others |
-| GET | `/tracks` | List tracks (dashboard uses limit 500; includes format/bitrate from files) |
+| GET | `/tracks` | List tracks (dashboard uses limit 500; includes `pipeline_stage`, format/bitrate from files) |
 | PATCH | `/tracks/{id}/metadata` | Manual artist/title override → write tags + rename |
 | POST | `/tracks/{id}/reset` | Reset track; re-enqueue ingest |
 | POST | `/tracks/{id}/confirm-review` | Move review → ready |

@@ -21,50 +21,134 @@ class RecordingGenreInfo:
     musicbrainz_recording_id: str | None = None
 
 
+@dataclass(frozen=True)
+class RecordingSearchMatch:
+    artist: str
+    title: str
+    musicbrainz_recording_id: str
+    length_ms: int | None = None
+
+
 def search_recording_id(artist: str, title: str) -> str | None:
     """Find a MusicBrainz recording ID from artist and title (no AcoustID required)."""
+    match = search_recording_match(artist, title)
+    return match.musicbrainz_recording_id if match else None
+
+
+def search_recording_match(
+    artist: str,
+    title: str,
+    *,
+    duration_seconds: float | None = None,
+) -> RecordingSearchMatch | None:
+    """Search MusicBrainz recordings by artist and title parsed from the filename."""
     artist = artist.strip()
     title = title.strip()
     if not artist or not title:
         return None
 
     query = f'artist:"{_lucene_escape(artist)}" AND recording:"{_lucene_escape(title)}"'
+    recordings = _search_recordings(query)
+    if not recordings:
+        return None
+
+    picked = _pick_best_recording(recordings, duration_seconds=duration_seconds)
+    return _parse_recording_match(picked) if picked else None
+
+
+def _search_recordings(query: str, *, limit: int = 5) -> list[dict[str, object]]:
     url = f"{MB_BASE}/recording"
     try:
         with httpx.Client(timeout=REQUEST_TIMEOUT) as client:
             response = client.get(
                 url,
-                params={"query": query, "fmt": "json", "limit": 3},
+                params={"query": query, "fmt": "json", "limit": limit},
                 headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
             )
             response.raise_for_status()
             data = response.json()
     except httpx.HTTPError as exc:
-        logger.warning(
-            "musicbrainz_search_failed",
-            artist=artist,
-            title=title,
-            error=str(exc),
-        )
-        return None
+        logger.warning("musicbrainz_search_failed", query=query, error=str(exc))
+        return []
     except Exception as exc:
-        logger.warning(
-            "musicbrainz_search_error",
-            artist=artist,
-            title=title,
-            error=str(exc),
-        )
-        return None
+        logger.warning("musicbrainz_search_error", query=query, error=str(exc))
+        return []
 
     recordings = data.get("recordings")
-    if not isinstance(recordings, list) or not recordings:
+    if not isinstance(recordings, list):
+        return []
+    return [item for item in recordings if isinstance(item, dict)]
+
+
+def _pick_best_recording(
+    recordings: list[dict[str, object]],
+    *,
+    duration_seconds: float | None,
+) -> dict[str, object] | None:
+    if not recordings:
+        return None
+    if duration_seconds is None:
+        return recordings[0]
+
+    target_ms = duration_seconds * 1000
+    best: dict[str, object] | None = None
+    best_delta = float("inf")
+    for recording in recordings:
+        length = recording.get("length")
+        if not isinstance(length, int):
+            continue
+        delta = abs(length - target_ms)
+        if delta < best_delta:
+            best = recording
+            best_delta = delta
+
+    return best if best is not None else recordings[0]
+
+
+def _parse_recording_match(recording: dict[str, object]) -> RecordingSearchMatch | None:
+    recording_id = recording.get("id")
+    title = recording.get("title")
+    if not isinstance(recording_id, str) or not recording_id:
+        return None
+    if not isinstance(title, str) or not title.strip():
         return None
 
-    first = recordings[0]
-    if not isinstance(first, dict):
+    artist = _artist_from_recording(recording)
+    if not artist:
         return None
-    recording_id = first.get("id")
-    return recording_id if isinstance(recording_id, str) and recording_id else None
+
+    length = recording.get("length")
+    length_ms = length if isinstance(length, int) else None
+    return RecordingSearchMatch(
+        artist=artist,
+        title=title.strip(),
+        musicbrainz_recording_id=recording_id,
+        length_ms=length_ms,
+    )
+
+
+def _artist_from_recording(recording: dict[str, object]) -> str | None:
+    credits = recording.get("artist-credit")
+    if not isinstance(credits, list):
+        return None
+
+    parts: list[str] = []
+    for credit in credits:
+        if not isinstance(credit, dict):
+            continue
+        name = credit.get("name")
+        if isinstance(name, str) and name.strip():
+            parts.append(name.strip())
+            continue
+        artist = credit.get("artist")
+        if isinstance(artist, dict):
+            artist_name = artist.get("name")
+            if isinstance(artist_name, str) and artist_name.strip():
+                parts.append(artist_name.strip())
+
+    if not parts:
+        return None
+    return ", ".join(parts)
 
 
 def lookup_recording_genres(recording_id: str) -> RecordingGenreInfo:
