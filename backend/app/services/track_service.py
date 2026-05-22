@@ -1,13 +1,15 @@
+from collections import defaultdict
 from pathlib import Path
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.enums import TrackStatus
 from app.models.track import Track
 from app.schemas.track import TrackResponse
 from app.schemas.track_summary import TrackStatusSummary
 from app.utils.audio_format import get_format_info
+from app.utils.pipeline_stage import resolve_pipeline_stage
 
 
 class TrackService:
@@ -20,7 +22,13 @@ class TrackService:
     def list_tracks(self, limit: int | None = None) -> list[TrackResponse]:
         cap = limit if limit is not None else self.DEFAULT_LIST_LIMIT
         rows = (
-            self._db.execute(select(Track).order_by(Track.updated_at.desc()).limit(cap))
+            self._db.execute(
+                select(Track)
+                .options(joinedload(Track.fingerprint))
+                .order_by(Track.updated_at.desc())
+                .limit(cap)
+            )
+            .unique()
             .scalars()
             .all()
         )
@@ -32,15 +40,38 @@ class TrackService:
         ).all()
         by_status = {status.value: count for status, count in rows}
         total = sum(by_status.values())
-        return TrackStatusSummary(total=total, by_status=by_status)
+
+        tracks = (
+            self._db.execute(select(Track).options(joinedload(Track.fingerprint)))
+            .unique()
+            .scalars()
+            .all()
+        )
+        by_pipeline_stage: dict[str, int] = defaultdict(int)
+        for track in tracks:
+            by_pipeline_stage[
+                resolve_pipeline_stage(track, has_fingerprint=track.fingerprint is not None)
+            ] += 1
+
+        return TrackStatusSummary(
+            total=total,
+            by_status=by_status,
+            by_pipeline_stage=dict(by_pipeline_stage),
+        )
 
     def get_track(self, track_id: int) -> TrackResponse | None:
-        row = self._db.get(Track, track_id)
+        row = self._db.execute(
+            select(Track).options(joinedload(Track.fingerprint)).where(Track.id == track_id)
+        ).scalar_one_or_none()
         return self._to_response(row) if row else None
 
     @staticmethod
     def _to_response(track: Track) -> TrackResponse:
-        response = TrackResponse.model_validate(track)
+        has_fingerprint = track.fingerprint is not None
+        pipeline_stage = resolve_pipeline_stage(track, has_fingerprint=has_fingerprint)
+        response = TrackResponse.model_validate(track).model_copy(
+            update={"pipeline_stage": pipeline_stage}
+        )
         audio_path = _resolve_track_audio_path(track)
         if audio_path is None:
             return response

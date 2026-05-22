@@ -18,6 +18,53 @@ REQUEST_TIMEOUT = 10.0
 class RecordingGenreInfo:
     genre: str | None
     subgenre: str | None
+    musicbrainz_recording_id: str | None = None
+
+
+def search_recording_id(artist: str, title: str) -> str | None:
+    """Find a MusicBrainz recording ID from artist and title (no AcoustID required)."""
+    artist = artist.strip()
+    title = title.strip()
+    if not artist or not title:
+        return None
+
+    query = f'artist:"{_lucene_escape(artist)}" AND recording:"{_lucene_escape(title)}"'
+    url = f"{MB_BASE}/recording"
+    try:
+        with httpx.Client(timeout=REQUEST_TIMEOUT) as client:
+            response = client.get(
+                url,
+                params={"query": query, "fmt": "json", "limit": 3},
+                headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
+            )
+            response.raise_for_status()
+            data = response.json()
+    except httpx.HTTPError as exc:
+        logger.warning(
+            "musicbrainz_search_failed",
+            artist=artist,
+            title=title,
+            error=str(exc),
+        )
+        return None
+    except Exception as exc:
+        logger.warning(
+            "musicbrainz_search_error",
+            artist=artist,
+            title=title,
+            error=str(exc),
+        )
+        return None
+
+    recordings = data.get("recordings")
+    if not isinstance(recordings, list) or not recordings:
+        return None
+
+    first = recordings[0]
+    if not isinstance(first, dict):
+        return None
+    recording_id = first.get("id")
+    return recording_id if isinstance(recording_id, str) and recording_id else None
 
 
 def lookup_recording_genres(recording_id: str) -> RecordingGenreInfo:
@@ -37,12 +84,17 @@ def lookup_recording_genres(recording_id: str) -> RecordingGenreInfo:
             data = response.json()
     except httpx.HTTPError as exc:
         logger.warning("musicbrainz_lookup_failed", recording_id=recording_id, error=str(exc))
-        return RecordingGenreInfo(None, None)
+        return RecordingGenreInfo(None, None, recording_id)
     except Exception as exc:
         logger.warning("musicbrainz_lookup_error", recording_id=recording_id, error=str(exc))
-        return RecordingGenreInfo(None, None)
+        return RecordingGenreInfo(None, None, recording_id)
 
-    return _parse_recording_genres(data)
+    parsed = _parse_recording_genres(data)
+    return RecordingGenreInfo(
+        genre=parsed.genre,
+        subgenre=parsed.subgenre,
+        musicbrainz_recording_id=recording_id,
+    )
 
 
 def _parse_recording_genres(data: dict[str, object]) -> RecordingGenreInfo:
@@ -97,3 +149,7 @@ def _pick_subgenre(genre: str | None, genres: list[str], tags: list[str]) -> str
         return title_case_genre(name)
 
     return None
+
+
+def _lucene_escape(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')

@@ -31,6 +31,7 @@
           variant="outlined"
           prepend-icon="mdi-refresh"
           :loading="loading"
+          title="Re-runs analyze, fingerprint, tag, and route for every track (one queue job at a time)"
           @click="$emit('reanalyze-all')"
         >
           Reanalyze all

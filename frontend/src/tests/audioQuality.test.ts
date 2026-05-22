@@ -14,6 +14,7 @@ function track(overrides: Partial<Track> = {}): Track {
   return {
     id: 1,
     status: 'ready',
+    pipeline_stage: 'ready',
     source_path: '/data/watch/song.mp3',
     processing_path: null,
     final_path: null,

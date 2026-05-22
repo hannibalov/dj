@@ -1,3 +1,5 @@
+import type { PipelineStage } from '@/utils/pipelineStage'
+
 export type TrackStatus =
   | 'queued'
   | 'processing'
@@ -11,6 +13,7 @@ export type TrackStatus =
 export interface Track {
   id: number
   status: TrackStatus
+  pipeline_stage: PipelineStage
   source_path: string
   processing_path: string | null
   final_path: string | null

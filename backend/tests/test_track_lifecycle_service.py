@@ -247,3 +247,44 @@ def test_confirm_review_moves_to_ready_and_removes_sibling_duplicate(
     db_session.refresh(sibling)
     assert sibling.status == TrackStatus.ARCHIVED
     assert sibling.final_path is None
+
+
+def test_confirm_review_enriches_missing_genres_from_musicbrainz(
+    db_session: Session, tmp_path: Path
+) -> None:
+    _folders(db_session, tmp_path)
+    review_file = tmp_path / "review" / "Firestarter - The Prodigy.mp3"
+    review_file.parent.mkdir(parents=True)
+    review_file.write_bytes(b"audio")
+
+    track = Track(
+        source_path=str(tmp_path / "watch" / "song.mp3"),
+        final_path=str(review_file),
+        status=TrackStatus.REVIEW,
+        artist="The Prodigy",
+        title="Firestarter",
+    )
+    db_session.add(track)
+    db_session.commit()
+
+    with (
+        patch("app.services.track_lifecycle_service.notify_pipeline_changed"),
+        patch(
+            "app.services.track_lifecycle_service.resolve_track_genres",
+            return_value=__import__(
+                "app.metadata.musicbrainz_lookup", fromlist=["RecordingGenreInfo"]
+            ).RecordingGenreInfo(
+                genre="Electronic",
+                subgenre="Big Beat",
+                musicbrainz_recording_id="mbid-firestarter",
+            ),
+        ),
+        patch("app.services.track_lifecycle_service.apply_resolved_genres_to_file") as mock_write,
+    ):
+        result = TrackLifecycleService(db_session).confirm_review(track.id)
+
+    assert result.status == TrackStatus.READY
+    assert result.genre == "Electronic"
+    assert result.subgenre == "Big Beat"
+    assert result.musicbrainz_recording_id == "mbid-firestarter"
+    mock_write.assert_called_once()

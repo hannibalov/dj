@@ -31,3 +31,9 @@ def title_case_genre(name: str) -> str:
 
 def genre_from_file_tags(tags: FileTags) -> tuple[str | None, str | None]:
     return parse_embedded_genre(tags.genre)
+
+
+def format_genre_tag(genre: str | None, subgenre: str | None) -> str | None:
+    if genre and subgenre:
+        return f"{genre}; {subgenre}"
+    return genre

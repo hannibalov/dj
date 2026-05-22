@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.logging import get_logger
+from app.metadata.genre import format_genre_tag
 from app.metadata.genre_resolve import resolve_track_genres
 from app.metadata.matcher import match_track_metadata, needs_metadata_review
 from app.metadata.rename import build_library_filename
@@ -21,12 +22,6 @@ from app.utils.job_payload import job_payload
 from app.services.settings_service import SettingsService
 
 logger = get_logger("TAGGER")
-
-
-def _genre_for_file_tags(genre: str | None, subgenre: str | None) -> str | None:
-    if genre and subgenre:
-        return f"{genre}; {subgenre}"
-    return genre
 
 
 class TagService:
@@ -80,6 +75,8 @@ class TagService:
             genres = resolve_track_genres(
                 audio_path=audio_path,
                 musicbrainz_recording_id=None,
+                artist=None,
+                title=None,
             )
             track.genre = genres.genre
             track.subgenre = genres.subgenre
@@ -95,8 +92,11 @@ class TagService:
         genres = resolve_track_genres(
             audio_path=audio_path,
             musicbrainz_recording_id=match.musicbrainz_recording_id,
+            artist=match.artist,
+            title=match.title,
         )
-        file_genre = _genre_for_file_tags(genres.genre, genres.subgenre)
+        file_genre = format_genre_tag(genres.genre, genres.subgenre)
+        recording_id = match.musicbrainz_recording_id or genres.musicbrainz_recording_id
 
         new_name = build_library_filename(
             artist=match.artist,
@@ -134,7 +134,7 @@ class TagService:
         track.genre = genres.genre
         track.subgenre = genres.subgenre
         track.mix_version = match.mix_version
-        track.musicbrainz_recording_id = match.musicbrainz_recording_id
+        track.musicbrainz_recording_id = recording_id
         track.tag_confidence = match.confidence
         track.needs_metadata_review = review
         track.tagged_at = datetime.now(UTC)

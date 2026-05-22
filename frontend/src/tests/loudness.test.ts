@@ -6,6 +6,7 @@ import { loudnessStatus, formatLoudnessSummary } from '@/utils/loudness'
 const baseTrack = {
   id: 1,
   status: 'ingested',
+  pipeline_stage: 'awaiting_fingerprint',
   source_path: '/a.mp3',
   processing_path: null,
   final_path: null,

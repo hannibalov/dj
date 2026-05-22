@@ -59,7 +59,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
-import type { TrackStatus } from '@/types/track'
+import type { PipelineStage } from '@/utils/pipelineStage'
 
 import DashboardActions from '@/components/DashboardActions.vue'
 import DuplicateGroupsCard from '@/components/DuplicateGroupsCard.vue'
@@ -73,7 +73,7 @@ import { useSettingsStore } from '@/stores/settingsStore'
 
 const pipeline = usePipelineStore()
 const settingsStore = useSettingsStore()
-const trackStatusFilter = ref<TrackStatus | null>(null)
+const trackStatusFilter = ref<PipelineStage | null>(null)
 const wsConnected = ref(false)
 const duplicateGroupsRef = ref<{ load: () => Promise<void> } | null>(null)
 

@@ -34,7 +34,7 @@
       />
       <template v-else>
         <p class="text-caption text-medium-emphasis mb-2">
-          Songs by stage (all tracks in database) — click to filter the table
+          Songs by pipeline step — click to filter the table
         </p>
         <div class="pipeline-stages d-flex flex-wrap ga-2 mb-4">
           <v-chip
@@ -64,9 +64,9 @@
           density="compact"
           class="mb-3"
         >
-          Artist and title are filled in at the <strong>TAG</strong> step, after analyze and
-          fingerprint. With {{ jobSummary.pending }} jobs queued, most tracks will look empty until
-          the worker catches up (one job at a time).
+          After <strong>Reanalyze all</strong>, most tracks show
+          <strong>Awaiting analyze</strong> until the worker reaches them (one job at a time).
+          Tracks move to <strong>Analyzed</strong> only after loudness/BPM analysis finishes.
         </v-alert>
 
         <v-divider class="mb-3" />
@@ -112,10 +112,12 @@ import { usePipelineStore } from '@/stores/pipelineStore'
 import { useSnackbarStore } from '@/stores/snackbarStore'
 import type { TrackStatusSummary } from '@/types/pipeline'
 import type { QueueSummary } from '@/types/queue'
-import type { Track, TrackStatus } from '@/types/track'
+import type { Track } from '@/types/track'
+import type { PipelineStage } from '@/utils/pipelineStage'
 import {
   activeCountFromSummary,
   activePipelineTracks,
+  archivedTrackCount,
   buildTrackStageCountsFromSummary,
   jobQueueSummary,
 } from '@/utils/pipelineCounts'
@@ -125,11 +127,11 @@ const props = defineProps<{
   trackSummary: TrackStatusSummary | null
   queue: QueueSummary | null | undefined
   loading: boolean
-  activeFilter: TrackStatus | null
+  activeFilter: PipelineStage | null
 }>()
 
 const emit = defineEmits<{
-  filter: [status: TrackStatus | null]
+  filter: [status: PipelineStage | null]
 }>()
 
 const pipeline = usePipelineStore()
@@ -141,13 +143,16 @@ const tracksShown = computed(() => activePipelineTracks(props.tracks).length)
 const activeCount = computed(() => activeCountFromSummary(props.trackSummary))
 const stageCounts = computed(() => buildTrackStageCountsFromSummary(props.trackSummary))
 const failedCount = computed(
-  () => props.trackSummary?.by_status.failed ?? 0,
+  () =>
+    props.trackSummary?.by_pipeline_stage?.failed ??
+    props.trackSummary?.by_status.failed ??
+    0,
 )
-const archivedCount = computed(() => props.trackSummary?.by_status.archived ?? 0)
+const archivedCount = computed(() => archivedTrackCount(props.trackSummary))
 const jobSummary = computed(() => jobQueueSummary(props.queue))
 const completedJobs = computed(() => props.queue?.completed ?? 0)
 
-function emitFilter(status: TrackStatus): void {
+function emitFilter(status: PipelineStage): void {
   emit('filter', props.activeFilter === status ? null : status)
 }
 

@@ -79,9 +79,9 @@
         <template #[`item.status`]="{ item }">
           <v-chip
             size="small"
-            :color="trackStatusColor(item.status)"
+            :color="pipelineStageColor(item.pipeline_stage)"
           >
-            {{ trackStatusLabel(item.status) }}
+            {{ pipelineStageLabel(item.pipeline_stage) }}
           </v-chip>
         </template>
         <template #[`item.bpm`]="{ item }">
@@ -192,8 +192,14 @@ import {
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useSnackbarStore } from '@/stores/snackbarStore'
-import type { Track, TrackStatus } from '@/types/track'
-import { basename, trackStatusColor, trackStatusLabel } from '@/utils/labels'
+import type { Track } from '@/types/track'
+import { basename } from '@/utils/labels'
+import {
+  PIPELINE_STAGE_ORDER,
+  pipelineStageColor,
+  pipelineStageLabel,
+  type PipelineStage,
+} from '@/utils/pipelineStage'
 import {
   compareBitrateTracks,
   compareQualityTracks,
@@ -213,11 +219,11 @@ const props = defineProps<{
   tracks: Track[]
   totalTracks: number
   loading: boolean
-  statusFilter?: TrackStatus | null
+  statusFilter?: PipelineStage | null
 }>()
 
 const emit = defineEmits<{
-  'update:statusFilter': [value: TrackStatus | null]
+  'update:statusFilter': [value: PipelineStage | null]
 }>()
 
 const pipeline = usePipelineStore()
@@ -288,23 +294,19 @@ async function saveMetadata(track: Track): Promise<void> {
 
 const statusFilterModel = computed({
   get: () => props.statusFilter ?? null,
-  set: (value: TrackStatus | null) => emit('update:statusFilter', value),
+  set: (value: PipelineStage | null) => emit('update:statusFilter', value),
 })
 
-const statusFilterItems = [
-  { title: 'Queued', value: 'queued' },
-  { title: 'Ingesting', value: 'processing' },
-  { title: 'In pipeline', value: 'ingested' },
-  { title: 'Ready', value: 'ready' },
-  { title: 'Needs review', value: 'review' },
-  { title: 'Failed', value: 'failed' },
-]
+const statusFilterItems = PIPELINE_STAGE_ORDER.map((stage) => ({
+  title: pipelineStageLabel(stage),
+  value: stage,
+}))
 
 const filteredTracks = computed(() => {
   if (!statusFilterModel.value) {
     return props.tracks
   }
-  return props.tracks.filter((t) => t.status === statusFilterModel.value)
+  return props.tracks.filter((t) => t.pipeline_stage === statusFilterModel.value)
 })
 
 const headers = [

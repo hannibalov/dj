@@ -4,6 +4,7 @@ import type { Track } from './track'
 export interface TrackStatusSummary {
   total: number
   by_status: Record<string, number>
+  by_pipeline_stage: Record<string, number>
 }
 
 export interface PipelineEvent {

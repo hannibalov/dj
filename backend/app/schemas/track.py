@@ -8,6 +8,7 @@ from app.models.enums import TrackStatus
 class TrackResponse(BaseModel):
     id: int
     status: TrackStatus
+    pipeline_stage: str = "queued"
     source_path: str
     processing_path: str | None
     final_path: str | None

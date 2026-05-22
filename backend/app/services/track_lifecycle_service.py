@@ -14,6 +14,7 @@ from app.schemas.settings import SettingsResponse
 from app.services.notify import notify_pipeline_changed
 from app.services.queue_service import ACTIVE_JOB_STATUSES, QueueService
 from app.services.settings_service import SettingsService
+from app.metadata.genre_resolve import apply_resolved_genres_to_file, resolve_track_genres
 from app.utils.workspace_files import (
     move_into_destination,
     path_is_under_root,
@@ -125,6 +126,8 @@ class TrackLifecycleService:
         track.status = TrackStatus.READY
         track.needs_metadata_review = False
 
+        self._enrich_genres_on_approve(track, dest)
+
         removed = self._remove_sibling_copies(track)
         watch_removed = remove_watch_source(track.source_path, watch_root)
         self._db.commit()
@@ -140,6 +143,45 @@ class TrackLifecycleService:
             siblings_cleared=removed,
         )
         return track
+
+    def _enrich_genres_on_approve(self, track: Track, audio_path: Path) -> None:
+        """Fill missing genre/subgenre from MusicBrainz before moving to ready."""
+        if not track.artist or not track.title:
+            return
+        if track.genre and track.subgenre:
+            return
+
+        genres = resolve_track_genres(
+            audio_path=audio_path,
+            musicbrainz_recording_id=track.musicbrainz_recording_id,
+            artist=track.artist,
+            title=track.title,
+        )
+        if not genres.genre and not genres.subgenre:
+            return
+
+        if genres.genre:
+            track.genre = genres.genre
+        if genres.subgenre:
+            track.subgenre = genres.subgenre
+        if genres.musicbrainz_recording_id:
+            track.musicbrainz_recording_id = genres.musicbrainz_recording_id
+
+        apply_resolved_genres_to_file(
+            audio_path,
+            genre=track.genre,
+            subgenre=track.subgenre,
+            artist=track.artist,
+            title=track.title,
+            album=track.album,
+        )
+        logger.info(
+            "track_genres_enriched_on_approve",
+            track_id=track.id,
+            genre=track.genre,
+            subgenre=track.subgenre,
+            musicbrainz_recording_id=track.musicbrainz_recording_id,
+        )
 
     def _remove_sibling_copies(self, keeper: Track) -> int:
         siblings = self._sibling_tracks(keeper.id)
