@@ -90,7 +90,7 @@ Priority order for **artist / title**:
 1. **AcoustID** fingerprint lookup (requires `DJ_ACOUSTID_API_KEY` + Chromaprint fingerprint).
 2. **Embedded tags** (ID3/Vorbis), with YouTube-style junk normalized (`backend/app/metadata/normalize.py`).
 3. **Filename** from the watch-folder drop or processing basename (`Title - Artist` or `Artist - Title`).
-4. **MusicBrainz text search** — when the best match is **below** the confidence threshold (Settings) and the filename parses to artist + title. Uses the original watch filename when available; optional duration match picks the closest recording. Source: `musicbrainz_search`.
+4. **MusicBrainz disambiguation** — when the filename has `Artist - Title` or `Title - Artist`, queries MusicBrainz with **both** orderings and picks the best match (duration + segment alignment). Canonical artist/title from MusicBrainz; source: `musicbrainz`. Beats filename heuristics and unverified embedded tags.
 
 Low-confidence or no match sets `needs_metadata_review` and routes to `review/` even when loudness/quality are OK.
 

@@ -37,7 +37,7 @@ Items deferred while shipping core pipeline features. **Not part of Phase 6a** u
 
 | Item | Source | Notes |
 |------|--------|--------|
-| Essentia in Docker on ARM/Pi | Phase 2, spec | BPM/key optional; loudness uses ffmpeg only |
+| ~~Essentia in Docker on ARM/Pi~~ | Phase 2, spec | Done — BPM/key in `docker/Dockerfile.backend` |
 | MusicBrainz Picard CLI in container | Phase 4 defer | pyacoustid used instead |
 | Artwork embed (Cover Art Archive) | Phase 4 defer | |
 | `GET /logs` | Phase 1+ | Stub in API |
@@ -55,7 +55,7 @@ Items deferred while shipping core pipeline features. **Not part of Phase 6a** u
 7a  Duplicate compare panel + waveform (5b)
 7b  Tag backlog + scheduler retries (5c)
 7c  Duplicate-rule settings UI (5d remainder)
-7d  Essentia on ARM (optional BPM/key in container)
+7d  ~~Essentia on ARM~~ (done — BPM/key in backend image)
 8+  Logs API, metrics dashboard, Picard/artwork
 ```
 
@@ -67,7 +67,7 @@ Items deferred while shipping core pipeline features. **Not part of Phase 6a** u
 
 | Area | Item |
 |------|------|
-| Images | `docker/Dockerfile.backend` (ffmpeg + fpcalc, production pip install) |
+| Images | `docker/Dockerfile.backend` (ffmpeg + fpcalc + Essentia BPM/key, production pip install) |
 | Images | `docker/Dockerfile.frontend` (nginx static + API/WS proxy) |
 | Compose | Root `docker-compose.yml` (build); `deploy/docker-compose.yml` (Pi pull via `DOCKER_USER`) |
 | Networking | nginx proxies `/api` and `/ws` to API container |
@@ -119,7 +119,7 @@ Tune on Pi 4 if OOM — worker is the heaviest (ffmpeg analyze).
 
 - Multi-arch manifest publishing to Docker Hub (documented; CI not required)
 - Kubernetes / Swarm
-- Essentia inside the image
+- ~~Essentia inside the image~~ — included in backend image
 - TLS / reverse proxy (Traefik/Caddy) — user can front nginx with their own proxy
 - ARMv7 (32-bit Pi) — target **arm64** only
 

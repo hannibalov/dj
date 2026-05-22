@@ -7,10 +7,10 @@ from app.analysis.result import AnalysisResult
 
 def analyze_audio(audio_path: Path) -> AnalysisResult:
     integrated_lufs, true_peak_db = measure_loudness(audio_path)
-    bpm, bpm_confidence, key, scale, camelot, key_confidence, energy = measure_musical(audio_path)
+    bpm, bpm_confidence, key, scale, camelot, key_confidence = measure_musical(audio_path)
 
-    if energy is None and integrated_lufs is not None:
-        energy = _energy_from_lufs(integrated_lufs)
+    # DJ energy 0–100 from loudness (Essentia Energy is sum-of-squares over the file → always clips to 100).
+    energy = _energy_from_lufs(integrated_lufs) if integrated_lufs is not None else None
 
     return AnalysisResult(
         bpm=bpm,

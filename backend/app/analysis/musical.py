@@ -12,30 +12,28 @@ MusicalMetrics = tuple[
     str | None,
     str | None,
     float | None,
-    int | None,
 ]
 
 
 def measure_musical(audio_path: Path) -> MusicalMetrics:
-    """BPM, bpm_confidence, key, scale, camelot, key_confidence, energy (0-100)."""
+    """BPM, bpm_confidence, key, scale, camelot, key_confidence (energy uses LUFS in analyzer)."""
     try:
         import essentia.standard as es  # type: ignore[import-not-found]
     except ImportError:
         logger.info("essentia_unavailable", path=str(audio_path))
-        return None, None, None, None, None, None, None
+        return None, None, None, None, None, None
 
     try:
         loader = es.MonoLoader(filename=str(audio_path))
         audio = loader()
     except Exception as exc:
         logger.warning("essentia_load_failed", path=str(audio_path), error=str(exc))
-        return None, None, None, None, None, None, None
+        return None, None, None, None, None, None
 
     bpm, bpm_confidence = _extract_bpm(audio, es)
     key, scale, key_confidence = _extract_key(audio, es)
     camelot = to_camelot(key, scale) if key and scale else None
-    energy = _extract_energy(audio, es)
-    return bpm, bpm_confidence, key, scale, camelot, key_confidence, energy
+    return bpm, bpm_confidence, key, scale, camelot, key_confidence
 
 
 def _extract_bpm(audio: object, es: object) -> tuple[float | None, float | None]:
@@ -53,10 +51,3 @@ def _extract_key(audio: object, es: object) -> tuple[str | None, str | None, flo
         return None, None, None
     return str(key), str(scale), round(float(strength), 3)
 
-
-def _extract_energy(audio: object, es: object) -> int | None:
-    energy_algo = es.Energy()  # type: ignore[attr-defined]
-    raw = float(energy_algo(audio))
-    # Essentia Energy is mean square; map to 0-100 for DJ UI
-    score = min(100, max(0, int(raw * 500)))
-    return score

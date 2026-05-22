@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import patch
 
 from app.metadata.artist_title import embedded_tags_swapped, resolve_artist_title
 from app.metadata.matcher import match_track_metadata
@@ -8,10 +9,11 @@ from app.metadata.tags import parse_filename_metadata
 from app.metadata.types import FileTags
 
 
-def test_resolve_title_artist_single_word_pair() -> None:
-    artist, title = resolve_artist_title("Wonderwall", "Oasis")
-    assert artist == "Oasis"
-    assert title == "Wonderwall"
+def test_resolve_ambiguous_single_word_pair_defaults_artist_first() -> None:
+    """Without tags, prefer Artist - Title; MusicBrainz disambiguation fixes Title - Artist files."""
+    artist, title = resolve_artist_title("CamelPhat", "Cola")
+    assert artist == "CamelPhat"
+    assert title == "Cola"
 
 
 def test_resolve_artist_title_multiword() -> None:
@@ -37,12 +39,12 @@ def test_normalize_youtube_channel_tags() -> None:
     assert normalized.title == "The Space In Between"
 
 
-def test_parse_filename_wonderwall(tmp_path: Path) -> None:
-    path = tmp_path / "Wonderwall - Oasis.mp3"
+def test_parse_filename_artist_first(tmp_path: Path) -> None:
+    path = tmp_path / "CamelPhat - Cola.mp3"
     path.write_bytes(b"fake")
     parsed = parse_filename_metadata(path)
-    assert parsed.artist == "Oasis"
-    assert parsed.title == "Wonderwall"
+    assert parsed.artist == "CamelPhat"
+    assert parsed.title == "Cola"
 
 
 def test_build_library_filename_wonderwall() -> None:
@@ -66,22 +68,35 @@ def test_build_library_filename_jan_blomqvist() -> None:
     assert "Official Music Video" not in name
 
 
-def test_matcher_prefers_filename_when_embedded_swapped(tmp_path: Path) -> None:
+def test_matcher_prefers_musicbrainz_over_flipped_filename(tmp_path: Path) -> None:
     path = tmp_path / "Wonderwall - Oasis.mp3"
     path.write_bytes(b"fake")
 
-    match = match_track_metadata(
-        path,
-        raw_fingerprint=None,
-        duration_seconds=None,
-        acoustid_api_key=None,
-        confidence_threshold=0.5,
+    mb_hit = __import__(
+        "app.metadata.musicbrainz_lookup", fromlist=["RecordingSearchMatch"]
+    ).RecordingSearchMatch(
+        artist="Oasis",
+        title="Wonderwall",
+        musicbrainz_recording_id="mbid-wonderwall",
+        length_ms=258000,
     )
+
+    with patch(
+        "app.metadata.matcher.search_recording_best",
+        return_value=mb_hit,
+    ):
+        match = match_track_metadata(
+            path,
+            raw_fingerprint=None,
+            duration_seconds=258.0,
+            acoustid_api_key=None,
+            confidence_threshold=0.5,
+        )
 
     assert match is not None
     assert match.artist == "Oasis"
     assert match.title == "Wonderwall"
-    assert match.source == "filename"
+    assert match.source == "musicbrainz"
 
 
 def test_embedded_tags_swapped_detection() -> None:

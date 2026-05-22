@@ -32,8 +32,8 @@ def test_reprocess_ignores_stale_embedded_tags(tmp_path: Path) -> None:
 
     assert match is not None
     assert match.artist == "Jan Blomqvist"
-    assert "Space In Between" in match.title
-    assert match.source == "filename"
+    assert "space in between" in match.title.casefold()
+    assert match.source in ("filename", "musicbrainz")
 
 
 def test_reprocess_prefers_watch_filename_over_generic_processing_name(tmp_path: Path) -> None:
@@ -62,4 +62,4 @@ def test_reprocess_prefers_watch_filename_over_generic_processing_name(tmp_path:
 
     assert match is not None
     assert match.artist == "Jan Blomqvist"
-    assert "Space In Between" in match.title
+    assert "space in between" in match.title.casefold()

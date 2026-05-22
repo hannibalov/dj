@@ -31,6 +31,15 @@
       />
       <v-divider class="my-6" />
       <h2 class="text-subtitle-1 mb-2">
+        Analysis display
+      </h2>
+      <AnalysisSettingsForm
+        :key-notation="settingsStore.settings.key_notation"
+        :loading="settingsStore.loading"
+        @submit="onSaveAnalysisDisplay"
+      />
+      <v-divider class="my-6" />
+      <h2 class="text-subtitle-1 mb-2">
         Loudness gates
       </h2>
       <p class="text-body-2 text-medium-emphasis mb-4">
@@ -68,12 +77,13 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 
+import AnalysisSettingsForm from '@/components/AnalysisSettingsForm.vue'
 import FolderSettingsForm from '@/components/FolderSettingsForm.vue'
 import LoudnessSettingsForm from '@/components/LoudnessSettingsForm.vue'
 import QualitySettingsForm from '@/components/QualitySettingsForm.vue'
 import TagSettingsForm from '@/components/TagSettingsForm.vue'
 import { useSettingsStore } from '@/stores/settingsStore'
-import type { FolderSettings } from '@/types/settings'
+import type { FolderSettings, KeyNotation } from '@/types/settings'
 
 const settingsStore = useSettingsStore()
 
@@ -89,6 +99,10 @@ async function onSaveTagging(payload: {
   tag_confidence_threshold: number
   naming_template: string
 }): Promise<void> {
+  await settingsStore.save(payload)
+}
+
+async function onSaveAnalysisDisplay(payload: { key_notation: KeyNotation }): Promise<void> {
   await settingsStore.save(payload)
 }
 

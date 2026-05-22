@@ -229,7 +229,7 @@ Auto rules in `version_priority.py` remain the **default** until the user resolv
 - Auto-delete duplicates
 - Beatgrid / hot cues / Rekordbox analysis replacement
 - Picard CLI orchestration or artwork embed (Phase 4 deferred)
-- Essentia in Docker on ARM/Pi
+- ~~Essentia in Docker on ARM/Pi~~ (done — see `docker/Dockerfile.backend`)
 - Full `GET /logs` implementation
 - Dashboard CPU/RAM metrics (spec dashboard)
 - Smart playlists / AI recommendations

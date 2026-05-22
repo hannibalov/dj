@@ -88,14 +88,7 @@
           {{ item.bpm != null ? item.bpm.toFixed(1) : '—' }}
         </template>
         <template #[`item.key`]="{ item }">
-          <span v-if="item.musical_key && item.scale">
-            {{ item.musical_key }} {{ item.scale }}
-            <span
-              v-if="item.camelot"
-              class="text-medium-emphasis"
-            >({{ item.camelot }})</span>
-          </span>
-          <span v-else>—</span>
+          {{ formatTrackKey(item, keyNotation) ?? '—' }}
         </template>
         <template #[`item.energy`]="{ item }">
           {{ item.energy ?? '—' }}
@@ -214,6 +207,7 @@ import {
   loudnessStatusLabel,
   type LoudnessThresholds,
 } from '@/utils/loudness'
+import { DEFAULT_KEY_NOTATION, formatTrackKey } from '@/utils/keyNotation'
 
 const props = defineProps<{
   tracks: Track[]
@@ -234,6 +228,10 @@ const loudnessThresholds = computed<LoudnessThresholds>(() => ({
   lufs: settingsStore.settings?.review_lufs_threshold ?? -18,
   peak: settingsStore.settings?.review_true_peak_db ?? 3.0,
 }))
+
+const keyNotation = computed(
+  () => settingsStore.settings?.key_notation ?? DEFAULT_KEY_NOTATION,
+)
 
 function trackLoudnessStatus(track: Track) {
   return loudnessStatus(track, loudnessThresholds.value)

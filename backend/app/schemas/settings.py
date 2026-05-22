@@ -1,4 +1,8 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+KeyNotation = Literal["camelot", "traditional"]
 
 
 class FolderSettings(BaseModel):
@@ -24,6 +28,7 @@ class SettingsResponse(FolderSettings):
     review_min_mp3_bitrate_kbps: int = 320
     review_min_lossless_bit_depth: int = 16
     review_min_lossless_sample_rate_hz: int = 44100
+    key_notation: KeyNotation = "camelot"
 
 
 class SettingsUpdate(BaseModel):
@@ -37,3 +42,4 @@ class SettingsUpdate(BaseModel):
     review_min_mp3_bitrate_kbps: int | None = Field(default=None, ge=0)
     review_min_lossless_bit_depth: int | None = Field(default=None, ge=0)
     review_min_lossless_sample_rate_hz: int | None = Field(default=None, ge=0)
+    key_notation: KeyNotation | None = None

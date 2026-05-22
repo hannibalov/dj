@@ -49,8 +49,13 @@ def parse_artist_title_from_compound(title: str) -> tuple[str | None, str]:
     return artist, song
 
 
-def _names_align(a: str, b: str) -> bool:
-    return a.strip().casefold() == b.strip().casefold()
+def names_align(a: str, b: str) -> bool:
+    """True when two names likely refer to the same performer or track title."""
+    left = a.strip().casefold()
+    right = b.strip().casefold()
+    if not left or not right:
+        return False
+    return left == right or left in right or right in left
 
 
 def normalize_embedded_tags(
@@ -84,7 +89,7 @@ def normalize_embedded_tags(
     if (
         not use_title_artist
         and tag_artist
-        and not _names_align(tag_artist, title_artist)
+        and not names_align(tag_artist, title_artist)
         and tag_title.casefold().startswith(title_artist.casefold())
     ):
         use_title_artist = True
@@ -94,8 +99,8 @@ def normalize_embedded_tags(
         and filename
         and filename.artist
         and filename.title
-        and _names_align(filename.artist, title_artist)
-        and _names_align(filename.title, title_song)
+        and names_align(filename.artist, title_artist)
+        and names_align(filename.title, title_song)
     ):
         use_title_artist = True
 

@@ -15,7 +15,7 @@ Self-hosted DJ library ingestion for **Raspberry Pi 4** and Docker. Watches a sy
 |-------|------------|
 | Backend | Python 3.11+, FastAPI, SQLAlchemy, SQLite, watchdog, structlog |
 | Frontend | Vue 3, Vite, TypeScript, Pinia, Vuetify |
-| Analysis | ffmpeg, Chromaprint (`fpcalc`), pyacoustid; Essentia optional (not in Docker yet) |
+| Analysis | ffmpeg, Chromaprint (`fpcalc`), pyacoustid, Essentia (BPM/key in Docker image) |
 | Runtime | **Docker Compose** (recommended for Pi) |
 
 ## Current pipeline (Phases 1–5)
@@ -111,7 +111,7 @@ sudo apt install ffmpeg libchromaprint-tools
 |------|----------------|
 | ffmpeg | Loudness analysis |
 | fpcalc | Fingerprints & duplicates |
-| Essentia | BPM/key (optional; not in Docker image yet) |
+| Essentia | BPM/key (included in Docker backend image; optional for local dev without Docker) |
 
 ### 2. Run (four terminals)
 
@@ -298,7 +298,7 @@ docker compose run --rm db-init
 |----------|-----|--------|
 | **Now** | [PHASE6.md](./docs/PHASE6.md) | Docker on Pi (6a) |
 | Later | PHASE6 backlog | Duplicate compare + waveforms (5b), tag backlog + retries (5c), duplicate-rule settings (5d remainder) |
-| Later | — | Essentia on ARM, `GET /logs`, metrics dashboard |
+| Later | — | `GET /logs`, metrics dashboard |
 
 ---
 

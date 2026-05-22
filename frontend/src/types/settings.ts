@@ -1,3 +1,5 @@
+export type KeyNotation = 'camelot' | 'traditional'
+
 export interface FolderSettings {
   watch_folder: string
   incoming_folder: string
@@ -21,6 +23,7 @@ export interface AppSettings extends FolderSettings {
   review_min_mp3_bitrate_kbps: number
   review_min_lossless_bit_depth: number
   review_min_lossless_sample_rate_hz: number
+  key_notation: KeyNotation
 }
 
 export interface SettingsUpdatePayload {
@@ -34,4 +37,5 @@ export interface SettingsUpdatePayload {
   review_min_mp3_bitrate_kbps?: number
   review_min_lossless_bit_depth?: number
   review_min_lossless_sample_rate_hz?: number
+  key_notation?: KeyNotation
 }

@@ -25,7 +25,7 @@ def test_low_confidence_filename_match_uses_musicbrainz_search(tmp_path: Path) -
     with (
         patch("app.metadata.matcher.read_tags", return_value=empty),
         patch("app.metadata.tags.read_tags", return_value=empty),
-        patch("app.metadata.matcher.search_recording_match", return_value=mb_hit) as mock_search,
+        patch("app.metadata.matcher.search_recording_best", return_value=mb_hit) as mock_search,
     ):
         match = match_track_metadata(
             audio,
@@ -38,12 +38,16 @@ def test_low_confidence_filename_match_uses_musicbrainz_search(tmp_path: Path) -
         )
 
     assert match is not None
-    assert match.source == "musicbrainz_search"
+    assert match.source == "musicbrainz"
     assert match.artist == "The Prodigy"
     assert match.title == "Firestarter"
     assert match.musicbrainz_recording_id == "mbid-firestarter"
     assert match.confidence >= 0.9
-    mock_search.assert_called_once_with("The Prodigy", "Firestarter", duration_seconds=279.0)
+    mock_search.assert_called_once_with(
+        "Firestarter",
+        "The Prodigy",
+        duration_seconds=279.0,
+    )
 
 
 def test_high_confidence_acoustid_skips_musicbrainz_search(tmp_path: Path) -> None:
@@ -65,7 +69,7 @@ def test_high_confidence_acoustid_skips_musicbrainz_search(tmp_path: Path) -> No
                 score=0.95,
             ),
         ),
-        patch("app.metadata.matcher.search_recording_match") as mock_search,
+        patch("app.metadata.matcher.search_recording_best") as mock_search,
     ):
         match = match_track_metadata(
             audio,

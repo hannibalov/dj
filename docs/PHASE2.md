@@ -21,7 +21,8 @@ After ingest (`track.status == ingested`), run analysis and route tracks to `rea
 | Area | Location |
 |------|----------|
 | Loudness (ffmpeg `ebur128`) | `backend/app/analysis/loudness.py` |
-| BPM / key / energy (Essentia, optional) | `backend/app/analysis/musical.py` |
+| BPM / key (Essentia in Docker) | `backend/app/analysis/musical.py` |
+| Energy 0–100 (from LUFS) | `backend/app/analysis/analyzer.py` |
 | Camelot mapping | `backend/app/analysis/camelot.py` |
 | Orchestration | `backend/app/analysis/analyzer.py` |
 | Result type | `backend/app/analysis/result.py` |
@@ -102,7 +103,7 @@ make lint
 
 ## Deferred
 
-- Essentia preinstalled in Docker image (ARM/Pi)
+- ~~Essentia preinstalled in Docker image (ARM/Pi)~~ — done in `docker/Dockerfile.backend`
 - Worker CPU/RAM limits enforced during analysis
 - Duplicate-rule settings UI (see [PHASE6 backlog](./PHASE6.md#backlog-from-earlier-phases))
 - Split “loudness gate” vs “final library route” when Phase 4 adds tagging (Phase 3 added fingerprint + `duplicates/` routing)
@@ -117,12 +118,14 @@ make lint
 
 Restart **API**, **worker**, **watcher**, and **frontend**. API runs `create_tables()` + migration on startup.
 
-### Essentia (optional)
+### Essentia (BPM / key / energy)
 
-Loudness + routing work with **ffmpeg only**. BPM/key need Essentia:
+**Docker:** Essentia is built into `docker/Dockerfile.backend` (no extra setup on Pi).
+
+**Local dev:** optional — install Essentia on the host, or use Docker. Without Essentia, loudness + routing still work (ffmpeg only); BPM/key columns stay empty.
 
 ```bash
-conda install -c mtg essentia   # example
+conda install -c mtg essentia   # example for local dev
 ```
 
 ### Backlog analysis

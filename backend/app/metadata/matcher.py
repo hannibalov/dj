@@ -1,12 +1,12 @@
-"""Combine AcoustID, embedded tags, and filename hints into match metadata."""
+"""Combine AcoustID, MusicBrainz, embedded tags, and filename hints into match metadata."""
 
 from dataclasses import dataclass
 from pathlib import Path
 
 from app.metadata.acoustid_lookup import AcoustIdMatch, lookup_by_fingerprint
 from app.metadata.artist_title import embedded_tags_swapped
-from app.metadata.musicbrainz_lookup import RecordingSearchMatch, search_recording_match
-from app.metadata.normalize import normalize_embedded_tags
+from app.metadata.musicbrainz_lookup import RecordingSearchMatch, search_recording_best
+from app.metadata.normalize import names_align, normalize_embedded_tags
 from app.metadata.tags import parse_filename_metadata, read_tags
 from app.metadata.types import FileTags
 
@@ -52,6 +52,16 @@ def match_track_metadata(
     if path not in filename_paths:
         filename_paths.append(path)
 
+    segments = _filename_segments(*filename_paths)
+    if segments is not None:
+        mb = search_recording_best(
+            segments[0],
+            segments[1],
+            duration_seconds=duration_seconds,
+        )
+        if mb is not None:
+            candidates.append(_from_musicbrainz(mb))
+
     parsed = _best_filename_match(*filename_paths)
     embedded_raw = read_tags(path)
 
@@ -62,8 +72,10 @@ def match_track_metadata(
             filename=parsed if parsed.artist and parsed.title else None,
         )
         if embedded.artist and embedded.title:
-            confidence = 0.75
-            if (
+            confidence = 0.62
+            if _corroborates_any(candidates, embedded):
+                confidence = 0.78
+            elif (
                 parsed.artist
                 and parsed.title
                 and (
@@ -71,7 +83,7 @@ def match_track_metadata(
                     or embedded.title != embedded_raw.title
                 )
             ):
-                confidence = 0.8
+                confidence = 0.72
             candidates.append(
                 MetadataMatch(
                     artist=embedded.artist,
@@ -85,7 +97,7 @@ def match_track_metadata(
             )
 
     if parsed.artist and parsed.title:
-        filename_confidence = 0.7 if reprocess else 0.55
+        filename_confidence = 0.52 if reprocess else 0.48
         if not reprocess:
             embedded = normalize_embedded_tags(
                 embedded_raw.artist,
@@ -93,11 +105,11 @@ def match_track_metadata(
                 filename=parsed,
             )
             if embedded_raw.artist and embedded_raw.title and embedded_tags_swapped(embedded, parsed):
-                filename_confidence = 0.82
+                filename_confidence = 0.68
             elif not embedded_raw.artist and not embedded_raw.title:
-                filename_confidence = 0.65
+                filename_confidence = 0.58
         elif filename_hint_path is not None and filename_hint_path in filename_paths:
-            filename_confidence = 0.78
+            filename_confidence = 0.62
         candidates.append(
             MetadataMatch(
                 artist=parsed.artist,
@@ -113,16 +125,26 @@ def match_track_metadata(
     if not candidates:
         return None
 
-    best = max(candidates, key=lambda c: c.confidence)
-    if _should_search_musicbrainz(best, threshold=confidence_threshold, parsed=parsed):
-        mb_match = _match_from_musicbrainz_search(
-            parsed,
-            duration_seconds=duration_seconds,
-        )
-        if mb_match is not None:
-            candidates.append(mb_match)
-
     return max(candidates, key=lambda c: c.confidence)
+
+
+def _filename_segments(*paths: Path) -> tuple[str, str] | None:
+    """Raw 'left - right' stem segments (order not yet resolved)."""
+    best: tuple[str, str] | None = None
+    best_score = -1
+    for path in paths:
+        stem = path.stem
+        if " - " not in stem:
+            continue
+        left, right = stem.split(" - ", 1)
+        left, right = left.strip(), right.strip()
+        if not left or not right:
+            continue
+        score = len(left) + len(right)
+        if score > best_score:
+            best = (left, right)
+            best_score = score
+    return best
 
 
 def _best_filename_match(*paths: Path) -> FileTags:
@@ -158,58 +180,31 @@ def _from_acoustid(acoustid: AcoustIdMatch) -> MetadataMatch:
     )
 
 
-def _should_search_musicbrainz(
-    best: MetadataMatch,
-    *,
-    threshold: float,
-    parsed: FileTags,
-) -> bool:
-    """Use MusicBrainz text search when filename hints exist but confidence is low."""
-    if not parsed.artist or not parsed.title:
-        return False
-    if best.confidence >= threshold:
-        return False
-    return True
-
-
-def _match_from_musicbrainz_search(
-    parsed: FileTags,
-    *,
-    duration_seconds: float | None,
-) -> MetadataMatch | None:
-    assert parsed.artist and parsed.title
-    hit = search_recording_match(
-        parsed.artist,
-        parsed.title,
-        duration_seconds=duration_seconds,
-    )
-    if hit is None:
-        return None
+def _from_musicbrainz(hit: RecordingSearchMatch) -> MetadataMatch:
     return MetadataMatch(
         artist=hit.artist,
         title=hit.title,
         album=None,
         mix_version=None,
         musicbrainz_recording_id=hit.musicbrainz_recording_id,
-        confidence=_musicbrainz_search_confidence(hit, duration_seconds=duration_seconds),
-        source="musicbrainz_search",
+        confidence=_musicbrainz_confidence(hit),
+        source="musicbrainz",
     )
 
 
-def _musicbrainz_search_confidence(
-    hit: RecordingSearchMatch,
-    *,
-    duration_seconds: float | None,
-) -> float:
-    confidence = 0.88
-    if duration_seconds is None or hit.length_ms is None:
-        return confidence
+def _musicbrainz_confidence(hit: RecordingSearchMatch) -> float:
+    return 0.94
 
-    delta_seconds = abs(hit.length_ms / 1000 - duration_seconds)
-    if delta_seconds <= 5:
-        return 0.93
-    if delta_seconds <= 15:
-        return 0.9
-    if delta_seconds > 45:
-        return 0.78
-    return confidence
+
+def _corroborates_any(candidates: list[MetadataMatch], tags: FileTags) -> bool:
+    if not tags.artist or not tags.title:
+        return False
+    trusted_sources = frozenset({"acoustid", "musicbrainz"})
+    for candidate in candidates:
+        if candidate.source not in trusted_sources:
+            continue
+        if names_align(tags.artist, candidate.artist) and names_align(tags.title, candidate.title):
+            return True
+        if names_align(tags.artist, candidate.title) and names_align(tags.title, candidate.artist):
+            return True
+    return False

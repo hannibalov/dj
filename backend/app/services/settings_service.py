@@ -31,6 +31,7 @@ class SettingsService:
             review_min_mp3_bitrate_kbps=env.review_min_mp3_bitrate_kbps,
             review_min_lossless_bit_depth=env.review_min_lossless_bit_depth,
             review_min_lossless_sample_rate_hz=env.review_min_lossless_sample_rate_hz,
+            key_notation=env.key_notation,
         )
 
     def _load_overrides(self) -> dict[str, str]:
@@ -73,6 +74,8 @@ class SettingsService:
                 "review_min_lossless_sample_rate_hz",
                 str(payload.review_min_lossless_sample_rate_hz),
             )
+        if payload.key_notation is not None:
+            self._upsert("key_notation", payload.key_notation)
         self._db.commit()
         return self.get_all()
 

@@ -1,5 +1,6 @@
 """MusicBrainz recording genres and community tags."""
 
+import time
 from dataclasses import dataclass
 
 import httpx
@@ -41,7 +42,7 @@ def search_recording_match(
     *,
     duration_seconds: float | None = None,
 ) -> RecordingSearchMatch | None:
-    """Search MusicBrainz recordings by artist and title parsed from the filename."""
+    """Search MusicBrainz recordings by artist and title."""
     artist = artist.strip()
     title = title.strip()
     if not artist or not title:
@@ -54,6 +55,75 @@ def search_recording_match(
 
     picked = _pick_best_recording(recordings, duration_seconds=duration_seconds)
     return _parse_recording_match(picked) if picked else None
+
+
+def search_recording_best(
+    left: str,
+    right: str,
+    *,
+    duration_seconds: float | None = None,
+) -> RecordingSearchMatch | None:
+    """
+    Resolve Artist-Title vs Title-Artist by querying MusicBrainz with both orderings.
+
+    Picks the match that best fits duration and filename segments (canonical MB credits).
+    """
+    left = left.strip()
+    right = right.strip()
+    if not left or not right:
+        return None
+
+    best: RecordingSearchMatch | None = None
+    best_rank = float("-inf")
+    orderings = ((left, right), (right, left))
+    for index, (artist, title) in enumerate(orderings):
+        if index > 0:
+            time.sleep(1.1)
+        hit = search_recording_match(artist, title, duration_seconds=duration_seconds)
+        if hit is None:
+            continue
+        rank = _rank_search_hit(hit, left, right, duration_seconds=duration_seconds)
+        if rank > best_rank:
+            best = hit
+            best_rank = rank
+    return best
+
+
+def _rank_search_hit(
+    hit: RecordingSearchMatch,
+    left: str,
+    right: str,
+    *,
+    duration_seconds: float | None,
+) -> float:
+    score = 0.0
+    if duration_seconds is not None and hit.length_ms is not None:
+        delta = abs(hit.length_ms / 1000 - duration_seconds)
+        if delta <= 5:
+            score += 100.0
+        elif delta <= 15:
+            score += 75.0
+        elif delta <= 45:
+            score += 40.0
+        else:
+            score -= min(delta, 120.0)
+
+    artist_fold = hit.artist.casefold()
+    title_fold = hit.title.casefold()
+    left_fold = left.casefold()
+    right_fold = right.casefold()
+
+    if _segment_matches(artist_fold, left_fold) and _segment_matches(title_fold, right_fold):
+        score += 25.0
+    if _segment_matches(artist_fold, right_fold) and _segment_matches(title_fold, left_fold):
+        score += 25.0
+    return score
+
+
+def _segment_matches(canonical: str, segment: str) -> bool:
+    if not canonical or not segment:
+        return False
+    return canonical == segment or segment in canonical or canonical in segment
 
 
 def _search_recordings(query: str, *, limit: int = 5) -> list[dict[str, object]]:

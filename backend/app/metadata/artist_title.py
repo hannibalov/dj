@@ -90,9 +90,8 @@ def resolve_artist_title(
     if score_forward > score_swap:
         return artist_title
 
-    if len(left.split()) == 1 and len(right.split()) == 1:
-        return title_artist
-
+    # Ambiguous without tags — prefer Artist - Title (common in DJ downloads).
+    # Authoritative order comes from MusicBrainz disambiguation in matcher.py.
     return artist_title
 
 

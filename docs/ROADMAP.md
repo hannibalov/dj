@@ -10,7 +10,7 @@ Phased delivery aligned with [dj-library-pipeline-spec.md](../dj-library-pipelin
 | 4 | [PHASE4.md](./PHASE4.md) | **Complete** | AcoustID tagging, **metadata-based renaming** |
 | 5 | [PHASE5.md](./PHASE5.md) | **Complete (5a)** | Duplicate resolution UI, `POST /duplicates/resolve` |
 | 6 | [PHASE6.md](./PHASE6.md) | **In progress (6a)** | Docker on Raspberry Pi (images, compose, deploy docs) |
-| 7+ | [PHASE6.md](./PHASE6.md#backlog-from-earlier-phases) | Planned | 5b–5d backlog, Essentia ARM, logs, metrics |
+| 7+ | [PHASE6.md](./PHASE6.md#backlog-from-earlier-phases) | Planned | 5b–5d backlog, logs, metrics |
 
 ---
 
@@ -19,7 +19,7 @@ Phased delivery aligned with [dj-library-pipeline-spec.md](../dj-library-pipelin
 ```text
 watch / POST /queue/rescan
     → INGEST
-    → ANALYZE      (ffmpeg loudness + optional Essentia)
+    → ANALYZE      (ffmpeg loudness + Essentia BPM/key in Docker)
     → FINGERPRINT  (fpcalc → duplicate groups)
     → TAG          (AcoustID / tags / filename → rename in processing/)
     → ROUTE        (ready/ vs review/ for preferred copies)
@@ -55,7 +55,7 @@ The API exposes `pipeline_stage` on each track and `by_pipeline_stage` in `track
 |------|-------|----------------|--------------|
 | ffmpeg | 2 | Manual | Yes |
 | fpcalc (Chromaprint) | 3 | Manual | Yes (`libchromaprint-tools`) |
-| Essentia | 2 (optional) | Manual | Deferred on ARM/Pi |
+| Essentia | 2 | Docker image | BPM/key in `Dockerfile.backend`; optional for local dev |
 | pyacoustid | 4 | pip (`backend`) | Yes |
 | httpx (MusicBrainz search + genres) | 4 | pip (`backend`) | Yes |
 | AcoustID API key | 4 | `.env` | `.env` / compose |
@@ -94,4 +94,4 @@ Full table: [PHASE6.md § Backlog from earlier phases](./PHASE6.md#backlog-from-
 | Duplicate compare + waveforms | Phase 7a (was 5b) |
 | Tag backlog + scheduler retries | Phase 7b (was 5c) |
 | Loudness / duplicate settings UI | Phase 7c (was 5d) — **loudness + quality gates done**; duplicate-rule toggle still open |
-| Essentia on ARM, Picard/artwork, MusicBrainz editor submit on Approve, `GET /logs`, CPU/RAM dashboard | Phase 8+ |
+| Picard/artwork, MusicBrainz editor submit on Approve, `GET /logs`, CPU/RAM dashboard | Phase 8+ |

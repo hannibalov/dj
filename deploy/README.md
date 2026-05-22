@@ -45,6 +45,8 @@ Image names use **your Docker Hub ID** (see https://hub.docker.com/settings/gene
 
 **Intel Mac:** same script; buildx cross-builds arm64.
 
+**First backend build** compiles Essentia from source (~5–15 minutes depending on CPU). Later builds cache that layer. The image includes BPM/key analysis (no separate install on the Pi).
+
 To also publish amd64 (optional):
 
 ```bash
@@ -106,7 +108,7 @@ docker compose pull && docker compose up -d
 
 Open the dashboard → **Reanalyze all** if a release fixed analysis, tagging, WAV support, or genre lookup and you need to refresh existing tracks. The **worker** service must be running until the job queue is empty.
 
-After upgrading, it is normal to see **Backlogged** with many pending jobs on a Pi — the worker runs **one job at a time** (analyze/ffmpeg is slow). Pipeline chips show granular steps (**Awaiting analyze**, **Analyzed**, **Awaiting tag**, …); artist/title and genre/subgenre fill in at **TAG**, not during analyze.
+After upgrading, it is normal to see **Backlogged** with many pending jobs on a Pi — the worker runs **one job at a time** (analyze: ffmpeg loudness + Essentia BPM/key is slow). Pipeline chips show granular steps (**Awaiting analyze**, **Analyzed**, **Awaiting tag**, …); artist/title and genre/subgenre fill in at **TAG**, not during analyze.
 
 If you accumulated **failed jobs** from an older image (e.g. WAV `not a Frame instance` on tag rows), use **Clear failed jobs** after deploying the fix, then **Reanalyze all** (or per-track **Reset**). Clearing failed jobs alone does not re-queue tracks. See [Dashboard troubleshooting](#dashboard-troubleshooting-pi) and [README § Dashboard](../README.md#dashboard).
 

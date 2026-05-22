@@ -27,3 +27,18 @@ def test_update_settings_persists_folders(client: TestClient) -> None:
     response = client.put("/settings", json=payload)
     assert response.status_code == 200
     assert response.json()["watch_folder"] == "/tmp/watch"
+
+
+def test_get_settings_default_key_notation_camelot(client: TestClient) -> None:
+    response = client.get("/settings")
+    assert response.status_code == 200
+    assert response.json()["key_notation"] == "camelot"
+
+
+def test_update_key_notation_persists(client: TestClient) -> None:
+    response = client.put("/settings", json={"key_notation": "traditional"})
+    assert response.status_code == 200
+    assert response.json()["key_notation"] == "traditional"
+
+    again = client.get("/settings")
+    assert again.json()["key_notation"] == "traditional"

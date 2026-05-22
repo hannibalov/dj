@@ -30,6 +30,7 @@ describe('settingsStore', () => {
       review_min_mp3_bitrate_kbps: 320,
       review_min_lossless_bit_depth: 16,
       review_min_lossless_sample_rate_hz: 44100,
+      key_notation: 'camelot' as const,
     }
     vi.spyOn(settingsService, 'fetchSettings').mockResolvedValue(mockSettings)
 

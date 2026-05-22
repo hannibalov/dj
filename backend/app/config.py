@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -79,6 +80,10 @@ class Settings(BaseSettings):
     naming_template: str = Field(
         default="{title} - {artist} ({mix}){ext}",
         description="Library filename template after tagging",
+    )
+    key_notation: Literal["camelot", "traditional"] = Field(
+        default="camelot",
+        description="Track key display: camelot (8A) or traditional (A minor)",
     )
 
 
