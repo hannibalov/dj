@@ -36,6 +36,16 @@
         >
           Reanalyze all
         </v-btn>
+        <v-btn
+          color="secondary"
+          variant="outlined"
+          prepend-icon="mdi-tag-multiple"
+          :loading="loading"
+          title="Fetch missing genre/subgenre from MusicBrainz for tagged tracks (no full reanalyze)"
+          @click="$emit('genre-backfill')"
+        >
+          Genre backfill
+        </v-btn>
       </span>
     </v-card-text>
   </v-card>
@@ -50,5 +60,6 @@ defineEmits<{
   rescan: []
   'analyze-backlog': []
   'reanalyze-all': []
+  'genre-backfill': []
 }>()
 </script>

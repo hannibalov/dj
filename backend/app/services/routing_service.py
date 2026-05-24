@@ -100,6 +100,17 @@ class RoutingService:
             status=track.status.value,
             review=review,
         )
+        self._notify_song_duplicate_review()
+
+    def _notify_song_duplicate_review(self) -> None:
+        from app.services.notify import notify_pipeline_changed
+        from app.services.song_duplicate_service import SongDuplicateService
+
+        groups = SongDuplicateService(self._db).list_groups()
+        if groups:
+            notify_pipeline_changed(
+                f"Same-song review: {len(groups)} group(s) need comparison"
+            )
 
     def _get_track(self, source_path: str) -> Track | None:
         return self._db.execute(

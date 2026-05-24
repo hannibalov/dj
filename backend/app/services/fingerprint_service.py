@@ -14,7 +14,11 @@ from app.models.track import Track
 from app.services.queue_service import QueueService
 from app.utils.job_payload import job_payload
 from app.services.settings_service import SettingsService
-from app.utils.workspace_files import clear_stale_processing_copy, move_into_destination
+from app.utils.workspace_files import (
+    clear_stale_processing_copy,
+    move_into_destination,
+    remove_watch_source,
+)
 
 logger = get_logger("DUPLICATES")
 
@@ -125,6 +129,9 @@ class FingerprintService:
                 final_path=track.final_path,
             )
             self._db.commit()
+            settings = SettingsService(self._db).get_all()
+            if remove_watch_source(track.source_path, Path(settings.watch_folder)):
+                logger.info("watch_source_removed", source=track.source_path)
             return
 
         audio = self._audio_file(track)
@@ -147,6 +154,8 @@ class FingerprintService:
         track.processing_path = None
         track.status = TrackStatus.DUPLICATE
         self._db.commit()
+        if remove_watch_source(track.source_path, Path(settings.watch_folder)):
+            logger.info("watch_source_removed", source=track.source_path)
         logger.info(
             "duplicate_routed",
             source=track.source_path,

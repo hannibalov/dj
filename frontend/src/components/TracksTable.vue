@@ -24,7 +24,6 @@
         :headers="headers"
         :items="filteredTracks"
         :loading="loading"
-        :custom-key-sort="tableSort"
         item-key="id"
         density="compact"
         :items-per-page="10"
@@ -71,10 +70,32 @@
           </div>
         </template>
         <template #[`item.genre`]="{ item }">
-          {{ item.genre ?? '—' }}
+          <v-text-field
+            :model-value="draftGenre(item)"
+            density="compact"
+            variant="plain"
+            hide-details
+            placeholder="Genre"
+            class="metadata-field"
+            :disabled="metadataSavingId === item.id"
+            @update:model-value="(v) => setDraft(item, 'genre', v)"
+            @blur="() => saveMetadata(item)"
+            @keyup.enter="($event.target as HTMLInputElement)?.blur()"
+          />
         </template>
         <template #[`item.subgenre`]="{ item }">
-          {{ item.subgenre ?? '—' }}
+          <v-text-field
+            :model-value="draftSubgenre(item)"
+            density="compact"
+            variant="plain"
+            hide-details
+            placeholder="Subgenre"
+            class="metadata-field"
+            :disabled="metadataSavingId === item.id"
+            @update:model-value="(v) => setDraft(item, 'subgenre', v)"
+            @blur="() => saveMetadata(item)"
+            @keyup.enter="($event.target as HTMLInputElement)?.blur()"
+          />
         </template>
         <template #[`item.status`]="{ item }">
           <v-chip
@@ -194,8 +215,6 @@ import {
   type PipelineStage,
 } from '@/utils/pipelineStage'
 import {
-  compareBitrateTracks,
-  compareQualityTracks,
   formatAudioQualityLabel,
   formatBitrateLabel,
   formatExtensionLabel,
@@ -208,6 +227,7 @@ import {
   type LoudnessThresholds,
 } from '@/utils/loudness'
 import { DEFAULT_KEY_NOTATION, formatTrackKey } from '@/utils/keyNotation'
+import { createTrackTableSort } from '@/utils/trackTableSort'
 
 const props = defineProps<{
   tracks: Track[]
@@ -240,7 +260,9 @@ function trackLoudnessStatus(track: Track) {
 const actionLoadingId = ref<number | null>(null)
 const actionKind = ref<'reset' | 'confirm' | 'delete' | null>(null)
 const metadataSavingId = ref<number | null>(null)
-const metadataDrafts = ref<Record<number, { artist: string; title: string }>>({})
+const metadataDrafts = ref<
+  Record<number, { artist: string; title: string; genre: string; subgenre: string }>
+>({})
 
 function draftArtist(track: Track): string {
   return metadataDrafts.value[track.id]?.artist ?? track.artist ?? ''
@@ -250,11 +272,25 @@ function draftTitle(track: Track): string {
   return metadataDrafts.value[track.id]?.title ?? track.title ?? ''
 }
 
-function setDraft(track: Track, field: 'artist' | 'title', value: string): void {
+function draftGenre(track: Track): string {
+  return metadataDrafts.value[track.id]?.genre ?? track.genre ?? ''
+}
+
+function draftSubgenre(track: Track): string {
+  return metadataDrafts.value[track.id]?.subgenre ?? track.subgenre ?? ''
+}
+
+function setDraft(
+  track: Track,
+  field: 'artist' | 'title' | 'genre' | 'subgenre',
+  value: string,
+): void {
   const existing = metadataDrafts.value[track.id]
   metadataDrafts.value[track.id] = {
     artist: existing?.artist ?? track.artist ?? '',
     title: existing?.title ?? track.title ?? '',
+    genre: existing?.genre ?? track.genre ?? '',
+    subgenre: existing?.subgenre ?? track.subgenre ?? '',
     [field]: value,
   }
 }
@@ -266,8 +302,13 @@ async function saveMetadata(track: Track): Promise<void> {
   }
   const artist = draft.artist.trim()
   const title = draft.title.trim()
+  const genre = draft.genre.trim()
+  const subgenre = draft.subgenre.trim()
   const unchanged =
-    artist === (track.artist ?? '').trim() && title === (track.title ?? '').trim()
+    artist === (track.artist ?? '').trim() &&
+    title === (track.title ?? '').trim() &&
+    genre === (track.genre ?? '').trim() &&
+    subgenre === (track.subgenre ?? '').trim()
   if (unchanged) {
     delete metadataDrafts.value[track.id]
     return
@@ -279,7 +320,12 @@ async function saveMetadata(track: Track): Promise<void> {
 
   metadataSavingId.value = track.id
   try {
-    const result = await updateTrackMetadata(track.id, { artist, title })
+    const result = await updateTrackMetadata(track.id, {
+      artist,
+      title,
+      genre: genre || null,
+      subgenre: subgenre || null,
+    })
     delete metadataDrafts.value[track.id]
     snackbar.show(result.message ?? 'Tags updated', { color: 'success' })
     await pipeline.load()
@@ -307,28 +353,30 @@ const filteredTracks = computed(() => {
   return props.tracks.filter((t) => t.pipeline_stage === statusFilterModel.value)
 })
 
-const headers = [
-  { title: 'File', key: 'filename' },
-  { title: 'Artist', key: 'artist' },
-  { title: 'Title', key: 'title' },
-  { title: 'Genre', key: 'genre' },
-  { title: 'Subgenre', key: 'subgenre' },
-  { title: 'Status', key: 'status' },
-  { title: 'BPM', key: 'bpm' },
-  { title: 'Key', key: 'key' },
-  { title: 'Energy', key: 'energy' },
-  { title: 'Format', key: 'format' },
-  { title: 'Quality', key: 'quality' },
-  { title: 'Bitrate', key: 'bitrate_kbps' },
-  { title: 'Loudness', key: 'loudness', sortable: false, width: '200px' },
-  { title: 'Library copy', key: 'final_path' },
-  { title: 'Actions', key: 'actions', sortable: false, width: '200px' },
-]
+const headers = computed(() => {
+  const sort = createTrackTableSort({
+    keyNotation: keyNotation.value,
+    loudnessThresholds: loudnessThresholds.value,
+  })
 
-const tableSort = {
-  quality: compareQualityTracks,
-  bitrate_kbps: compareBitrateTracks,
-}
+  return [
+    { title: 'File', key: 'filename', sortRaw: sort.filename },
+    { title: 'Artist', key: 'artist', sortRaw: sort.artist },
+    { title: 'Title', key: 'title', sortRaw: sort.title },
+    { title: 'Genre', key: 'genre', sortRaw: sort.genre },
+    { title: 'Subgenre', key: 'subgenre', sortRaw: sort.subgenre },
+    { title: 'Status', key: 'status', sortRaw: sort.status },
+    { title: 'BPM', key: 'bpm', sortRaw: sort.bpm },
+    { title: 'Key', key: 'key', sortRaw: sort.key },
+    { title: 'Energy', key: 'energy', sortRaw: sort.energy },
+    { title: 'Format', key: 'format', sortRaw: sort.format },
+    { title: 'Quality', key: 'quality', sortRaw: sort.quality },
+    { title: 'Bitrate', key: 'bitrate_kbps', sortRaw: sort.bitrate_kbps },
+    { title: 'Loudness', key: 'loudness', sortable: false, width: '200px' },
+    { title: 'Library copy', key: 'final_path', sortRaw: sort.final_path },
+    { title: 'Actions', key: 'actions', sortable: false, width: '200px' },
+  ]
+})
 
 async function onDelete(trackId: number): Promise<void> {
   actionLoadingId.value = trackId

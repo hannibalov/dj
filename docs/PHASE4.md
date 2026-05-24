@@ -38,6 +38,7 @@ INGEST → ANALYZE → FINGERPRINT → TAG → ROUTE
 | AcoustID lookup | `backend/app/metadata/acoustid_lookup.py` |
 | MusicBrainz genre/tags | `backend/app/metadata/musicbrainz_lookup.py` |
 | Genre resolve (MB + embedded) | `backend/app/metadata/genre_resolve.py` |
+| Genre backfill (API) | `backend/app/services/genre_backfill_service.py` |
 | Match orchestration | `backend/app/metadata/matcher.py` |
 | Pipeline step (API) | `backend/app/utils/pipeline_stage.py` |
 | Job handler | `backend/app/services/tag_service.py` |
@@ -74,8 +75,7 @@ ID3 tags still store `artist` and `title` fields separately; only the **filename
 
 | Feature | Location |
 |---------|----------|
-| Artist / title (editable → `PATCH /tracks/{id}/metadata`; renames file per naming template) | `TracksTable.vue`, `trackService.ts` |
-| Genre / subgenre (read-only; set at TAG) | `TracksTable.vue` |
+| Artist / title / genre / subgenre (editable → `PATCH /tracks/{id}/metadata`; artist/title rename file per naming template) | `TracksTable.vue`, `trackService.ts` |
 | **Pipeline step chips** (awaiting analyze, analyzed, awaiting tag, …) | `QueueStatsCard.vue`, `utils/pipelineStage.ts` |
 | Format / quality / bitrate (from file via API; sortable columns) | `TracksTable.vue`, `utils/audioQuality.ts` |
 | Loudness badges (OK / Too quiet / High peak; thresholds from Settings) | `TracksTable.vue`, `utils/loudness.ts` |
@@ -98,27 +98,39 @@ Low-confidence or no match sets `needs_metadata_review` and routes to `review/` 
 
 Genre does **not** require AcoustID. Sources (in order):
 
-1. **MusicBrainz** — recording ID from AcoustID, or **artist/title search** (same query as metadata fallback).
-2. **Embedded** `genre` tag in the file (`Genre; Subgenre` split when compound).
+1. **MusicBrainz recording** — genres + community tags (`GET /recording/{id}?inc=genres+tags`).
+2. **MusicBrainz release** — if the recording has no tags, top linked **release** genres/tags (up to 3 releases).
+3. **MusicBrainz artist** — if still empty, primary **artist** genres/tags (up to 2 artists).
+4. **Embedded** `genre` tag in the file (`Genre; Subgenre` split when compound).
+
+Recording ID comes from AcoustID, or **artist/title search** (same query as metadata fallback).
 
 On **Approve** (`POST /tracks/{id}/confirm-review`), missing genre/subgenre is fetched again from MusicBrainz and written to the file before moving to `ready/`.
 
-MusicBrainz requests are sequential (1 req/s); fine with a single worker.
+On **manual metadata edit** (`PATCH /tracks/{id}/metadata`), genre/subgenre are written to the file when changed; if only artist/title changed and genre/subgenre are still missing, they are re-fetched from MusicBrainz.
+
+**Genre backfill** (`POST /queue/genre-backfill` or dashboard **Genre backfill**) re-runs MusicBrainz lookup for all tracks that already have artist + title but are missing genre or subgenre — without a full reanalyze. Runs inline in the API (respects MB 1 req/s; can take several minutes on large libraries).
+
+For a **full metadata refresh** (artist, title, rename, route gates), use **Reanalyze all** instead.
+
+MusicBrainz requests are throttled to 1 req/s; fine with a single worker or inline backfill.
 
 Implementation:
 
 | Area | Location |
 |------|----------|
 | MB recording search | `backend/app/metadata/musicbrainz_lookup.py` (`search_recording_match`) |
+| MB release + artist fallback | `backend/app/metadata/musicbrainz_lookup.py` (`lookup_recording_genres`) |
 | Genre resolve | `backend/app/metadata/genre_resolve.py` |
+| Genre backfill (API) | `backend/app/services/genre_backfill_service.py` |
 | Matcher + MB fallback | `backend/app/metadata/matcher.py` |
+| Manual edit genre re-resolve | `backend/app/services/track_metadata_service.py` |
 
 Details:
 
-1. `GET /recording/{id}?inc=genres+tags` when a recording ID is known.
-2. **Genre** — top MusicBrainz genre, else top tag, else embedded `genre` tag.
-3. **Subgenre** — more specific MusicBrainz tag (e.g. `Techno` → `Minimal Techno`), else second part of embedded `Genre; Subgenre`.
-4. Written to DB and to the file genre tag as `Genre; Subgenre` when both exist.
+1. **Genre** — top MusicBrainz genre, else top tag, else embedded `genre` tag (at each MB entity level: recording → release → artist).
+2. **Subgenre** — more specific MusicBrainz tag (e.g. `Techno` → `Minimal Techno`), else second part of embedded `Genre; Subgenre`.
+3. Written to DB and to the file genre tag as `Genre; Subgenre` when both exist.
 
 ### WAV / AIFF tagging
 
@@ -157,7 +169,7 @@ Terminal statuses mirror `TrackStatus`. While `status` is `ingested`, the API ex
 
 | Track field | Meaning |
 |-------------|---------|
-| `genre` / `subgenre` | Set at TAG (MusicBrainz search and/or embedded); backfill on **Approve** if still empty |
+| `genre` / `subgenre` | Set at TAG (MusicBrainz recording → release → artist + embedded); editable in dashboard; backfill on **Approve**, **Genre backfill**, or manual metadata edit |
 | `musicbrainz_recording_id` | From AcoustID or MusicBrainz artist/title search |
 | `needs_metadata_review` | Tag confidence below threshold or no match |
 | `tagged_at` | Tag job completed (idempotent skip) |
@@ -168,8 +180,9 @@ Terminal statuses mirror `TrackStatus`. While `status` is `ingested`, the API ex
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| PATCH | `/tracks/{id}/metadata` | Body: `{ "artist", "title" }` — write tags, rename file, set `tagged_at` |
-| POST | `/tracks/{id}/confirm-review` | Approve `review/` → `ready/`; optional MusicBrainz genre backfill |
+| PATCH | `/tracks/{id}/metadata` | Body: `{ "artist", "title", "genre?", "subgenre?" }` — write tags, rename file, set `tagged_at`; write genre/subgenre when changed; re-fetch missing genre/subgenre when only artist/title changed |
+| POST | `/tracks/{id}/confirm-review` | Approve `review/` → `ready/`; MusicBrainz genre backfill if missing |
+| POST | `/queue/genre-backfill` | Re-fetch missing genre/subgenre for tagged tracks (inline MB lookup) |
 
 ---
 
@@ -194,9 +207,16 @@ Worker needs outbound HTTPS to `api.acoustid.org` and `musicbrainz.org`.
 
 ### Watch folder lifecycle
 
-- When a track is routed to **`ready/`** (or **Approve** from review), the copy in **`watch/`** is deleted — the library file in `ready/` is canonical.
-- Tracks in **`review/`** keep the watch copy until you approve or reset.
-- **Reset** with no watch file: moves the `ready/` or `review/` library copy back to the original `source_path` under watch, then re-runs ingest.
+`watch/` is a **drop zone only** — the pipeline never writes there. Once a file is fully processed, its watch copy is removed; SQLite keeps the track row, fingerprint, and duplicate-group membership for dedup and audit (`source_path` is immutable).
+
+| Outcome | Watch copy | DB row |
+|---------|------------|--------|
+| Routed to **`ready/`** (or **Approve** from review) | Deleted | Kept |
+| Non-preferred duplicate → **`duplicates/<hash>/`** | Deleted after fingerprint | Kept (`duplicate` status) |
+| **`review/`** (loudness, quality, or metadata gate) | Kept until approve or reset | Kept |
+| **Reset** (no watch file) | Restored from `ready/` or `review/` to original `source_path` | Kept; pipeline re-runs |
+
+Re-dropping the same path while the track is already `ready`, `review`, `duplicate`, or `archived` does not re-ingest (queue dedup uses `source_path`).
 
 Restart **API**, **worker**, **watcher**, and **frontend** after code changes.
 
@@ -219,8 +239,8 @@ Restart **API**, **worker**, **watcher**, and **frontend** after code changes.
 - [x] Renamed file in `ready/` uses `Title - Artist (Mix).ext`
 - [x] Low-confidence / no-match tracks route to `review/` when flagged
 - [x] Settings UI: naming template + confidence threshold
-- [x] Genre/subgenre via MusicBrainz search + embedded tags; MB fallback on low-confidence filename matches; genre backfill on Approve
-- [x] Dashboard pipeline step chips (`pipeline_stage`); WAV/AIFF ID3 tagging; editable artist/title; format/quality/bitrate in UI; loudness + quality gates in Settings
+- [x] Genre/subgenre via MusicBrainz (recording → release → artist) + embedded tags; genre backfill API; re-resolve on manual edit; backfill on Approve
+- [x] Dashboard pipeline step chips (`pipeline_stage`); WAV/AIFF ID3 tagging; editable artist/title/genre/subgenre; format/quality/bitrate in UI; loudness + quality gates in Settings
 - [x] Docs updated: PHASE4, README, deploy troubleshooting
 
 ---

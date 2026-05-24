@@ -7,12 +7,15 @@ import httpx
 
 from app.logging import get_logger
 from app.metadata.genre import title_case_genre
+from app.metadata.rename import normalize_track_credits
 
 logger = get_logger("TAGGER")
 
 MB_BASE = "https://musicbrainz.org/ws/2"
 USER_AGENT = "dj-library-pipeline/0.1.0 (https://github.com/hannibalov/dj)"
 REQUEST_TIMEOUT = 10.0
+_MB_MIN_INTERVAL = 1.1
+_mb_last_request_at = 0.0
 
 
 @dataclass(frozen=True)
@@ -127,21 +130,9 @@ def _segment_matches(canonical: str, segment: str) -> bool:
 
 
 def _search_recordings(query: str, *, limit: int = 5) -> list[dict[str, object]]:
-    url = f"{MB_BASE}/recording"
-    try:
-        with httpx.Client(timeout=REQUEST_TIMEOUT) as client:
-            response = client.get(
-                url,
-                params={"query": query, "fmt": "json", "limit": limit},
-                headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
-            )
-            response.raise_for_status()
-            data = response.json()
-    except httpx.HTTPError as exc:
-        logger.warning("musicbrainz_search_failed", query=query, error=str(exc))
-        return []
-    except Exception as exc:
-        logger.warning("musicbrainz_search_error", query=query, error=str(exc))
+    data = _mb_get(f"{MB_BASE}/recording", {"query": query, "fmt": "json", "limit": limit})
+    if data is None:
+        logger.warning("musicbrainz_search_failed", query=query)
         return []
 
     recordings = data.get("recordings")
@@ -189,9 +180,10 @@ def _parse_recording_match(recording: dict[str, object]) -> RecordingSearchMatch
 
     length = recording.get("length")
     length_ms = length if isinstance(length, int) else None
+    artist, title, _ = normalize_track_credits(artist, title.strip(), None)
     return RecordingSearchMatch(
         artist=artist,
-        title=title.strip(),
+        title=title,
         musicbrainz_recording_id=recording_id,
         length_ms=length_ms,
     )
@@ -222,28 +214,60 @@ def _artist_from_recording(recording: dict[str, object]) -> str | None:
 
 
 def lookup_recording_genres(recording_id: str) -> RecordingGenreInfo:
-    """Fetch top genre and a more specific subgenre tag from MusicBrainz."""
+    """
+    Fetch genre/subgenre from MusicBrainz.
+
+    Tries recording tags first, then linked releases, then primary artist tags.
+    """
     if not recording_id:
         return RecordingGenreInfo(None, None)
 
-    url = f"{MB_BASE}/recording/{recording_id}"
-    try:
-        with httpx.Client(timeout=REQUEST_TIMEOUT) as client:
-            response = client.get(
-                url,
-                params={"inc": "genres+tags", "fmt": "json"},
-                headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
-            )
-            response.raise_for_status()
-            data = response.json()
-    except httpx.HTTPError as exc:
-        logger.warning("musicbrainz_lookup_failed", recording_id=recording_id, error=str(exc))
-        return RecordingGenreInfo(None, None, recording_id)
-    except Exception as exc:
-        logger.warning("musicbrainz_lookup_error", recording_id=recording_id, error=str(exc))
+    data = _mb_get(
+        f"{MB_BASE}/recording/{recording_id}",
+        {"inc": "artist-credits+genres+tags+releases", "fmt": "json"},
+    )
+    if data is None:
+        logger.warning("musicbrainz_lookup_failed", recording_id=recording_id)
         return RecordingGenreInfo(None, None, recording_id)
 
-    parsed = _parse_recording_genres(data)
+    parsed = _parse_entity_genres(data)
+    if parsed.genre:
+        return RecordingGenreInfo(
+            genre=parsed.genre,
+            subgenre=parsed.subgenre,
+            musicbrainz_recording_id=recording_id,
+        )
+
+    for release_id in _release_ids_from_recording(data, limit=3):
+        release_data = _mb_get(
+            f"{MB_BASE}/release/{release_id}",
+            {"inc": "genres+tags", "fmt": "json"},
+        )
+        if release_data is None:
+            continue
+        release_parsed = _parse_entity_genres(release_data)
+        if release_parsed.genre:
+            return RecordingGenreInfo(
+                genre=release_parsed.genre,
+                subgenre=release_parsed.subgenre,
+                musicbrainz_recording_id=recording_id,
+            )
+
+    for artist_id in _artist_ids_from_recording(data, limit=2):
+        artist_data = _mb_get(
+            f"{MB_BASE}/artist/{artist_id}",
+            {"inc": "genres+tags", "fmt": "json"},
+        )
+        if artist_data is None:
+            continue
+        artist_parsed = _parse_entity_genres(artist_data)
+        if artist_parsed.genre:
+            return RecordingGenreInfo(
+                genre=artist_parsed.genre,
+                subgenre=artist_parsed.subgenre,
+                musicbrainz_recording_id=recording_id,
+            )
+
     return RecordingGenreInfo(
         genre=parsed.genre,
         subgenre=parsed.subgenre,
@@ -251,7 +275,7 @@ def lookup_recording_genres(recording_id: str) -> RecordingGenreInfo:
     )
 
 
-def _parse_recording_genres(data: dict[str, object]) -> RecordingGenreInfo:
+def _parse_entity_genres(data: dict[str, object]) -> RecordingGenreInfo:
     genres = _sorted_names(data.get("genres"))
     tags = _sorted_names(data.get("tags"))
 
@@ -261,6 +285,74 @@ def _parse_recording_genres(data: dict[str, object]) -> RecordingGenreInfo:
 
     subgenre = _pick_subgenre(genre, genres, tags)
     return RecordingGenreInfo(genre=genre, subgenre=subgenre)
+
+
+def _release_ids_from_recording(data: dict[str, object], *, limit: int) -> list[str]:
+    releases = data.get("releases")
+    if not isinstance(releases, list):
+        return []
+
+    ids: list[str] = []
+    for release in releases:
+        if not isinstance(release, dict):
+            continue
+        release_id = release.get("id")
+        if isinstance(release_id, str) and release_id and release_id not in ids:
+            ids.append(release_id)
+        if len(ids) >= limit:
+            break
+    return ids
+
+
+def _artist_ids_from_recording(data: dict[str, object], *, limit: int) -> list[str]:
+    credits = data.get("artist-credit")
+    if not isinstance(credits, list):
+        return []
+
+    ids: list[str] = []
+    for credit in credits:
+        if not isinstance(credit, dict):
+            continue
+        artist = credit.get("artist")
+        if not isinstance(artist, dict):
+            continue
+        artist_id = artist.get("id")
+        if isinstance(artist_id, str) and artist_id and artist_id not in ids:
+            ids.append(artist_id)
+        if len(ids) >= limit:
+            break
+    return ids
+
+
+def _throttle_musicbrainz() -> None:
+    global _mb_last_request_at
+    elapsed = time.monotonic() - _mb_last_request_at
+    if elapsed < _MB_MIN_INTERVAL:
+        time.sleep(_MB_MIN_INTERVAL - elapsed)
+    _mb_last_request_at = time.monotonic()
+
+
+def _mb_get(url: str, params: dict[str, object]) -> dict[str, object] | None:
+    _throttle_musicbrainz()
+    try:
+        with httpx.Client(timeout=REQUEST_TIMEOUT) as client:
+            response = client.get(
+                url,
+                params=params,
+                headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
+            )
+            response.raise_for_status()
+            data = response.json()
+    except httpx.HTTPError as exc:
+        logger.warning("musicbrainz_request_failed", url=url, error=str(exc))
+        return None
+    except Exception as exc:
+        logger.warning("musicbrainz_request_error", url=url, error=str(exc))
+        return None
+
+    if not isinstance(data, dict):
+        return None
+    return data
 
 
 def _sorted_names(items: object) -> list[str]:

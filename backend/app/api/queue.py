@@ -6,9 +6,11 @@ from app.db.session import get_db
 from app.schemas.queue import (
     AnalyzeBacklogResponse,
     ClearFailedJobsResponse,
+    GenreBackfillResponse,
     QueueResponse,
     RescanResponse,
 )
+from app.services.genre_backfill_service import GenreBackfillService
 from app.services.queue_service import QueueService
 
 router = APIRouter()
@@ -74,5 +76,18 @@ async def reanalyze_all(db: Session = Depends(get_db)) -> AnalyzeBacklogResponse
     return AnalyzeBacklogResponse(
         status=result.status,
         enqueued=result.enqueued,
+        skipped=result.skipped,
+    )
+
+
+@router.post("/genre-backfill", response_model=GenreBackfillResponse)
+async def genre_backfill(db: Session = Depends(get_db)) -> GenreBackfillResponse:
+    result = GenreBackfillService(db).backfill_missing_genres()
+    await broadcast_snapshot(
+        f"Genre backfill: enriched {result.enriched}, skipped {result.skipped}"
+    )
+    return GenreBackfillResponse(
+        status=result.status,
+        enriched=result.enriched,
         skipped=result.skipped,
     )

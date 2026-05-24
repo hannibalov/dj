@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 import { fetchPipelineStatus } from '@/services/pipelineService'
-import { analyzeBacklog, reanalyzeAll, rescanQueue } from '@/services/queueService'
+import { analyzeBacklog, genreBackfill, reanalyzeAll, rescanQueue } from '@/services/queueService'
 import type { PipelineSnapshot } from '@/types/pipeline'
 
 import { useSnackbarStore } from './snackbarStore'
@@ -88,6 +88,24 @@ export const usePipelineStore = defineStore('pipeline', () => {
     }
   }
 
+  async function runGenreBackfill(): Promise<void> {
+    loading.value = true
+    try {
+      const result = await genreBackfill()
+      snackbar.show(
+        `Genre backfill: enriched ${result.enriched}, skipped ${result.skipped}. ` +
+          'MusicBrainz lookups run inline (may take a while on large libraries).',
+        { color: 'success' },
+      )
+    } catch (e) {
+      snackbar.show(e instanceof Error ? e.message : 'Genre backfill failed', {
+        color: 'error',
+      })
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     snapshot,
     loading,
@@ -103,6 +121,7 @@ export const usePipelineStore = defineStore('pipeline', () => {
     rescan,
     runAnalyzeBacklog,
     runReanalyzeAll,
+    runGenreBackfill,
     applySnapshot,
   }
 })

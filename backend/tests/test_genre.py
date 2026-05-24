@@ -1,5 +1,5 @@
 from app.metadata.genre import parse_embedded_genre, title_case_genre
-from app.metadata.musicbrainz_lookup import _parse_recording_genres
+from app.metadata.musicbrainz_lookup import _parse_entity_genres
 
 
 def test_parse_embedded_genre_splits_compound() -> None:
@@ -26,6 +26,6 @@ def test_musicbrainz_parse_genre_and_subgenre() -> None:
             {"name": "minimal techno", "count": 6},
         ],
     }
-    info = _parse_recording_genres(data)
+    info = _parse_entity_genres(data)
     assert info.genre == "Techno"
     assert info.subgenre == "Minimal Techno"

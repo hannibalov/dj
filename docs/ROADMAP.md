@@ -32,6 +32,8 @@ watch / POST /queue/rescan
 | `review/` | Too quiet, high peak, below min quality, low-confidence / missing metadata, or manual approval pending |
 | `duplicates/<fingerprint_hash>/` | Non-preferred duplicate (same fingerprint) |
 
+**Watch folder:** drop zone only. When a track reaches `ready/` or `duplicates/`, its watch copy is deleted; tracks in `review/` keep the watch file until approve. SQLite retains all track rows and fingerprints for dedup — see [PHASE4 § Watch folder lifecycle](./PHASE4.md#watch-folder-lifecycle).
+
 **Filenames in `ready/`:** `Title - Artist (Mix).ext` after Phase 4 TAG job.
 
 ### Dashboard pipeline steps
@@ -68,9 +70,9 @@ The API exposes `pipeline_stage` on each track and `by_pipeline_stage` in `track
 
 ### Phase 4 (metadata & dashboard)
 
-- **Backend:** `metadata/` (AcoustID, MusicBrainz search + genres, WAV/AIFF ID3 tags), `tag_service`, `track_metadata_service`, `track_lifecycle_service` (approve + genre backfill), `pipeline_stage` on track responses
-- **Frontend:** tracks table — editable artist/title, genre/subgenre, **pipeline step chips**, format/quality/bitrate (sortable), loudness badges; Settings — tagging, loudness gates, quality gates
-- **API:** `PATCH /tracks/{id}/metadata`, `POST /tracks/{id}/confirm-review`; `pipeline_stage` + `by_pipeline_stage` on pipeline snapshot
+- **Backend:** `metadata/` (AcoustID, MusicBrainz search + genres with release/artist fallback, WAV/AIFF ID3 tags), `tag_service`, `genre_backfill_service`, `track_metadata_service` (genre re-resolve on edit), `track_lifecycle_service` (approve + genre backfill), `pipeline_stage` on track responses
+- **Frontend:** tracks table — editable artist/title, genre/subgenre, **pipeline step chips**, format/quality/bitrate (sortable), loudness badges; dashboard **Genre backfill** action; Settings — tagging, loudness gates, quality gates
+- **API:** `PATCH /tracks/{id}/metadata`, `POST /tracks/{id}/confirm-review`, `POST /queue/genre-backfill`; `pipeline_stage` + `by_pipeline_stage` on pipeline snapshot
 - **Tests:** run `make test` for current counts
 
 ### Phase 3

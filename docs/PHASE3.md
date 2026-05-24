@@ -120,7 +120,8 @@ Restart **API**, **worker**, **watcher**, and **frontend** after code changes.
 1. Drop two copies of the same track (e.g. 128k and 320k MP3) into `data/watch/`.
 2. Let the pipeline run through fingerprint.
 3. Preferred copy → `data/ready/` or `data/review/`; other → `data/duplicates/<hash>/`.
-4. Dashboard **Duplicate groups** section lists grouped tracks.
+4. Both watch copies are removed once each copy reaches its final folder (see [PHASE4 § Watch folder lifecycle](./PHASE4.md#watch-folder-lifecycle)); DB rows and fingerprint groups remain for duplicate management.
+5. Dashboard **Duplicate groups** section lists grouped tracks.
 
 ---
 

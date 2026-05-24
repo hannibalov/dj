@@ -7,7 +7,9 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.logging import get_logger
-from app.metadata.rename import build_library_filename
+from app.metadata.genre import title_case_genre
+from app.metadata.genre_resolve import apply_resolved_genres_to_file, resolve_track_genres
+from app.metadata.rename import build_library_filename, normalize_track_credits
 from app.metadata.tags import write_tags
 from app.models.enums import TrackStatus
 from app.models.fingerprint import Fingerprint
@@ -28,7 +30,15 @@ class TrackMetadataService:
     def __init__(self, db: Session) -> None:
         self._db = db
 
-    def update_metadata(self, track_id: int, *, artist: str, title: str) -> Track:
+    def update_metadata(
+        self,
+        track_id: int,
+        *,
+        artist: str,
+        title: str,
+        genre: str | None = None,
+        subgenre: str | None = None,
+    ) -> Track:
         artist = artist.strip()
         title = title.strip()
         if not artist or not title:
@@ -37,6 +47,14 @@ class TrackMetadataService:
         track = self._db.get(Track, track_id)
         if track is None:
             raise TrackMetadataError(f"Track not found: {track_id}")
+
+        old_genre = track.genre
+        old_subgenre = track.subgenre
+        genre = _normalize_genre_field(genre)
+        subgenre = _normalize_genre_field(subgenre)
+        genre_fields_changed = genre != old_genre or subgenre != old_subgenre
+
+        artist, title, mix_version = normalize_track_credits(artist, title, track.mix_version)
 
         audio_path = _resolve_writable_audio_path(track)
         if audio_path is None:
@@ -48,7 +66,7 @@ class TrackMetadataService:
         new_name = build_library_filename(
             artist=artist,
             title=title,
-            mix=track.mix_version,
+            mix=mix_version,
             extension=audio_path.suffix,
             template=settings.naming_template,
         )
@@ -87,11 +105,29 @@ class TrackMetadataService:
 
         track.artist = artist
         track.title = title
+        track.mix_version = mix_version
+        track.genre = genre
+        track.subgenre = subgenre
         track.tagged_at = datetime.now(UTC)
         track.tag_confidence = 1.0
         track.needs_metadata_review = False
+
+        if genre_fields_changed:
+            apply_resolved_genres_to_file(
+                final_path,
+                genre=track.genre,
+                subgenre=track.subgenre,
+                artist=track.artist,
+                title=track.title,
+                album=track.album,
+            )
+        else:
+            self._resolve_genres_after_edit(track, final_path)
+
         self._db.commit()
         self._db.refresh(track)
+
+        self._notify_song_duplicate_review()
 
         notify_pipeline_changed(f"Metadata updated: {artist} — {title}")
         logger.info(
@@ -182,6 +218,61 @@ class TrackMetadataService:
             )
             return True
         return False
+
+
+    def _resolve_genres_after_edit(self, track: Track, audio_path: Path) -> None:
+        """Re-fetch genre/subgenre from MusicBrainz after manual artist/title correction."""
+        if track.genre and track.subgenre:
+            return
+
+        genres = resolve_track_genres(
+            audio_path=audio_path,
+            musicbrainz_recording_id=track.musicbrainz_recording_id,
+            artist=track.artist,
+            title=track.title,
+        )
+        if not genres.genre and not genres.subgenre:
+            return
+
+        if genres.genre and not track.genre:
+            track.genre = genres.genre
+        if genres.subgenre and not track.subgenre:
+            track.subgenre = genres.subgenre
+        if genres.musicbrainz_recording_id:
+            track.musicbrainz_recording_id = genres.musicbrainz_recording_id
+
+        apply_resolved_genres_to_file(
+            audio_path,
+            genre=track.genre,
+            subgenre=track.subgenre,
+            artist=track.artist,
+            title=track.title,
+            album=track.album,
+        )
+        logger.info(
+            "track_genres_resolved_after_metadata_edit",
+            track_id=track.id,
+            genre=track.genre,
+            subgenre=track.subgenre,
+        )
+
+    def _notify_song_duplicate_review(self) -> None:
+        from app.services.song_duplicate_service import SongDuplicateService
+
+        groups = SongDuplicateService(self._db).list_groups()
+        if groups:
+            notify_pipeline_changed(
+                f"Same-song review: {len(groups)} group(s) need comparison"
+            )
+
+
+def _normalize_genre_field(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    return title_case_genre(cleaned)
 
 
 def _resolve_writable_audio_path(track: Track) -> Path | None:

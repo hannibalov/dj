@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 from mutagen.wave import WAVE
 
+from app.metadata.musicbrainz_lookup import RecordingGenreInfo
 from app.models.enums import TrackStatus
 from app.models.setting import Setting
 from app.models.track import Track
@@ -56,6 +57,74 @@ def test_update_metadata_writes_tags_and_db(db_session, tmp_path: Path) -> None:
     assert str(tagged.tags["TPE1"]) == "deadmau5"
     assert str(tagged.tags["TIT2"]) == "Strobe"
     assert "Strobe - deadmau5" in Path(updated.processing_path).name
+
+
+def test_update_metadata_resolves_genres_after_edit(db_session, tmp_path: Path) -> None:
+    wav = tmp_path / "processing" / "wrong - name.wav"
+    wav.parent.mkdir(parents=True)
+    _minimal_wav(wav)
+    track = Track(
+        source_path=str(tmp_path / "watch" / wav.name),
+        processing_path=str(wav),
+        status=TrackStatus.REVIEW,
+        needs_metadata_review=True,
+    )
+    db_session.add(track)
+    db_session.commit()
+    _settings(db_session, tmp_path)
+
+    with (
+        patch("app.services.track_metadata_service.notify_pipeline_changed"),
+        patch(
+            "app.services.track_metadata_service.resolve_track_genres",
+            return_value=RecordingGenreInfo("Techno", "Minimal Techno", "mbid-techno"),
+        ),
+        patch("app.services.track_metadata_service.apply_resolved_genres_to_file") as mock_apply,
+    ):
+        updated = TrackMetadataService(db_session).update_metadata(
+            track.id,
+            artist="deadmau5",
+            title="Strobe",
+        )
+
+    assert updated.genre == "Techno"
+    assert updated.subgenre == "Minimal Techno"
+    assert updated.musicbrainz_recording_id == "mbid-techno"
+    mock_apply.assert_called_once()
+
+
+def test_update_metadata_writes_manual_genre_and_subgenre(db_session, tmp_path: Path) -> None:
+    wav = tmp_path / "processing" / "wrong - name.wav"
+    wav.parent.mkdir(parents=True)
+    _minimal_wav(wav)
+    track = Track(
+        source_path=str(tmp_path / "watch" / wav.name),
+        processing_path=str(wav),
+        status=TrackStatus.REVIEW,
+        artist="deadmau5",
+        title="Strobe",
+    )
+    db_session.add(track)
+    db_session.commit()
+    _settings(db_session, tmp_path)
+
+    with (
+        patch("app.services.track_metadata_service.notify_pipeline_changed"),
+        patch("app.services.track_metadata_service.resolve_track_genres") as mock_resolve,
+        patch("app.services.track_metadata_service.apply_resolved_genres_to_file") as mock_apply,
+    ):
+        updated = TrackMetadataService(db_session).update_metadata(
+            track.id,
+            artist="deadmau5",
+            title="Strobe",
+            genre="house",
+            subgenre="deep house",
+        )
+
+    assert updated.genre == "House"
+    assert updated.subgenre == "Deep House"
+    mock_resolve.assert_not_called()
+    mock_apply.assert_called_once()
 
 
 def test_update_metadata_requires_audio_file(db_session) -> None:

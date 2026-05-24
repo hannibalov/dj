@@ -11,7 +11,7 @@ from app.logging import get_logger
 from app.metadata.genre import format_genre_tag
 from app.metadata.genre_resolve import resolve_track_genres
 from app.metadata.matcher import match_track_metadata, needs_metadata_review
-from app.metadata.rename import build_library_filename
+from app.metadata.rename import build_library_filename, normalize_track_credits
 from app.metadata.tags import write_tags
 from app.models.enums import JobStatus, TrackStatus
 from app.models.fingerprint import Fingerprint
@@ -98,10 +98,16 @@ class TagService:
         file_genre = format_genre_tag(genres.genre, genres.subgenre)
         recording_id = match.musicbrainz_recording_id or genres.musicbrainz_recording_id
 
+        artist, title, mix_version = normalize_track_credits(
+            match.artist,
+            match.title,
+            match.mix_version,
+        )
+
         new_name = build_library_filename(
-            artist=match.artist,
-            title=match.title,
-            mix=match.mix_version,
+            artist=artist,
+            title=title,
+            mix=mix_version,
             extension=audio_path.suffix,
             template=settings.naming_template,
         )
@@ -115,8 +121,8 @@ class TagService:
         try:
             write_tags(
                 audio_path,
-                artist=match.artist,
-                title=match.title,
+                artist=artist,
+                title=title,
                 album=match.album,
                 genre=file_genre,
             )
@@ -128,12 +134,12 @@ class TagService:
             logger.error("tag_write_failed", source=job.source_path, error=str(exc))
             return
 
-        track.artist = match.artist
-        track.title = match.title
+        track.artist = artist
+        track.title = title
         track.album = match.album
         track.genre = genres.genre
         track.subgenre = genres.subgenre
-        track.mix_version = match.mix_version
+        track.mix_version = mix_version
         track.musicbrainz_recording_id = recording_id
         track.tag_confidence = match.confidence
         track.needs_metadata_review = review
@@ -144,8 +150,8 @@ class TagService:
         logger.info(
             "tag_complete",
             source=job.source_path,
-            artist=match.artist,
-            title=match.title,
+            artist=artist,
+            title=title,
             confidence=match.confidence,
             review=review,
         )

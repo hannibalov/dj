@@ -7,6 +7,7 @@ from app.metadata.acoustid_lookup import AcoustIdMatch, lookup_by_fingerprint
 from app.metadata.artist_title import embedded_tags_swapped
 from app.metadata.musicbrainz_lookup import RecordingSearchMatch, search_recording_best
 from app.metadata.normalize import names_align, normalize_embedded_tags
+from app.metadata.rename import normalize_track_credits
 from app.metadata.tags import parse_filename_metadata, read_tags
 from app.metadata.types import FileTags
 
@@ -125,7 +126,29 @@ def match_track_metadata(
     if not candidates:
         return None
 
-    return max(candidates, key=lambda c: c.confidence)
+    best = max(candidates, key=lambda c: c.confidence)
+    return _normalize_match(best)
+
+
+def _normalize_match(match: MetadataMatch) -> MetadataMatch:
+    artist, title, mix = normalize_track_credits(match.artist, match.title, match.mix_version)
+    if (
+        artist == match.artist
+        and title == match.title
+        and mix == match.mix_version
+    ):
+        return match
+    return MetadataMatch(
+        artist=artist,
+        title=title,
+        album=match.album,
+        mix_version=mix,
+        musicbrainz_recording_id=match.musicbrainz_recording_id,
+        confidence=match.confidence,
+        source=match.source,
+        genre=match.genre,
+        subgenre=match.subgenre,
+    )
 
 
 def _filename_segments(*paths: Path) -> tuple[str, str] | None:

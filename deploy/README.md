@@ -106,7 +106,7 @@ cd ~/dj-pipeline
 docker compose pull && docker compose up -d
 ```
 
-Open the dashboard → **Reanalyze all** if a release fixed analysis, tagging, WAV support, or genre lookup and you need to refresh existing tracks. The **worker** service must be running until the job queue is empty.
+Open the dashboard → **Genre backfill** to fetch missing genre/subgenre for already-tagged tracks (inline MusicBrainz lookup; no worker queue). Use **Reanalyze all** if a release fixed analysis, tagging, WAV support, or you need a full pipeline refresh — the **worker** must be running until the job queue is empty.
 
 After upgrading, it is normal to see **Backlogged** with many pending jobs on a Pi — the worker runs **one job at a time** (analyze: ffmpeg loudness + Essentia BPM/key is slow). Pipeline chips show granular steps (**Awaiting analyze**, **Analyzed**, **Awaiting tag**, …); artist/title and genre/subgenre fill in at **TAG**, not during analyze.
 
@@ -200,13 +200,13 @@ Tuning compose `mem_limit` / `cpus` is the cleanest approach once **Option A** i
 | Symptom | Likely cause | What to do |
 |---------|----------------|------------|
 | Many **Awaiting analyze**, no artist/title | TAG not reached yet (normal after **Reanalyze all**) or TAG failed | Wait for queue, or check **Recent jobs** for `tag` errors. Worker must be Up. |
-| Tracks on **Awaiting tag** with artist/title but no genre | Filename-only match; empty embedded genre | Upgrade backend (MusicBrainz search); **Approve** or **Reanalyze all** |
+| Tracks on **Awaiting tag** with artist/title but no genre | Filename-only match; empty embedded genre | **Genre backfill** after TAG, or **Approve** / **Reanalyze all** |
 | TAG fails on **.wav** with `not a Frame instance` | Old image: WAV/AIFF tags need ID3 frames | Pull latest backend image; **Reanalyze all** |
 | **Worker idle** but 0 pending, tracks not **Ready** | Queue empty; tracks stuck after earlier failures | **Reanalyze all** or per-track **Reset**; then **Clear failed jobs** |
 | **Analyze backlog** does nothing | Only enqueues tracks with no LUFS yet | Use **Reanalyze all** if BPM/LUFS already filled |
 | **Worker idle**, many **pending** | Normal gap between jobs on Pi | Should show **Backlogged**; confirm `worker` is Up: `docker compose logs worker --tail 30` |
 | **Stalled**, pending > 0, running = 0 | Worker stopped or jobs stuck `running` | `docker compose start worker` or **Retry stalled jobs** |
-| No **genre** / **subgenre** | Old image or no MusicBrainz match for that title | Pull latest image; **Approve** review tracks or **Reanalyze all**; ensure Pi can reach `musicbrainz.org` |
+| No **genre** / **subgenre** | MB recording has no tags; empty embedded genre | **Genre backfill** (fast); edit inline in the tracks table; **Reanalyze all** for full refresh; ensure Pi can reach `musicbrainz.org` |
 | Filename looks like title–artist reversed | Library template is `Title - Artist (Mix).ext` by design | Table artist/title are still correct; edit inline if needed |
 | Pipeline shows **100** songs but you have more | Old image capped list at 100 | Upgrade image; chips use full DB counts on current builds |
 | Many **failed jobs** | Historical failures | **Clear failed jobs** after deploying fixes (does not re-queue tracks) |

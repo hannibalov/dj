@@ -52,6 +52,8 @@ def update_track_metadata(
             track_id,
             artist=body.artist,
             title=body.title,
+            genre=body.genre,
+            subgenre=body.subgenre,
         )
     except TrackMetadataError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

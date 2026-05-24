@@ -5,6 +5,7 @@
       @rescan="pipeline.rescan()"
       @analyze-backlog="pipeline.runAnalyzeBacklog()"
       @reanalyze-all="pipeline.runReanalyzeAll()"
+      @genre-backfill="pipeline.runGenreBackfill()"
     />
 
     <v-row class="mb-4">
@@ -35,6 +36,9 @@
       <v-col cols="12">
         <DuplicateGroupsCard ref="duplicateGroupsRef" />
       </v-col>
+      <v-col cols="12">
+        <SongDuplicateGroupsCard ref="songDuplicateGroupsRef" />
+      </v-col>
     </v-row>
 
     <v-row>
@@ -63,6 +67,7 @@ import type { PipelineStage } from '@/utils/pipelineStage'
 
 import DashboardActions from '@/components/DashboardActions.vue'
 import DuplicateGroupsCard from '@/components/DuplicateGroupsCard.vue'
+import SongDuplicateGroupsCard from '@/components/SongDuplicateGroupsCard.vue'
 import JobsTable from '@/components/JobsTable.vue'
 import QueueStatsCard from '@/components/QueueStatsCard.vue'
 import TracksTable from '@/components/TracksTable.vue'
@@ -76,11 +81,13 @@ const settingsStore = useSettingsStore()
 const trackStatusFilter = ref<PipelineStage | null>(null)
 const wsConnected = ref(false)
 const duplicateGroupsRef = ref<{ load: () => Promise<void> } | null>(null)
+const songDuplicateGroupsRef = ref<{ load: () => Promise<void> } | null>(null)
 
 usePipelineWebSocket(
   (data) => {
     pipeline.applySnapshot(data)
     void duplicateGroupsRef.value?.load()
+    void songDuplicateGroupsRef.value?.load()
   },
   (connected) => {
     wsConnected.value = connected

@@ -58,7 +58,13 @@ class QueueService:
             if processing_file.is_file():
                 return SKIP_ALREADY_INGESTED
 
-        if track.status in (TrackStatus.INGESTED, TrackStatus.READY, TrackStatus.REVIEW):
+        if track.status in (
+            TrackStatus.INGESTED,
+            TrackStatus.READY,
+            TrackStatus.REVIEW,
+            TrackStatus.DUPLICATE,
+            TrackStatus.ARCHIVED,
+        ):
             return SKIP_ALREADY_INGESTED
 
         return None

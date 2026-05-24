@@ -40,3 +40,59 @@ def test_lookup_recording_genres_returns_empty_on_http_error() -> None:
 
     assert info.genre is None
     assert info.subgenre is None
+
+
+def test_lookup_recording_genres_falls_back_to_release() -> None:
+    recording_id = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+    release_id = "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+    recording_payload = {
+        "genres": [],
+        "tags": [],
+        "releases": [{"id": release_id}],
+        "artist-credit": [{"artist": {"id": "artist-1", "name": "Artist"}}],
+    }
+    release_payload = {
+        "genres": [{"name": "electronic", "count": 3}],
+        "tags": [{"name": "techno", "count": 2}],
+    }
+
+    def fake_mb_get(url: str, params: dict[str, object]) -> dict[str, object] | None:
+        if url.endswith(f"/recording/{recording_id}"):
+            return recording_payload
+        if url.endswith(f"/release/{release_id}"):
+            return release_payload
+        return None
+
+    with patch("app.metadata.musicbrainz_lookup._mb_get", side_effect=fake_mb_get):
+        info = lookup_recording_genres(recording_id)
+
+    assert info.genre == "Electronic"
+    assert info.subgenre == "Techno"
+
+
+def test_lookup_recording_genres_falls_back_to_artist() -> None:
+    recording_id = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+    artist_id = "c3d4e5f6-a7b8-9012-cdef-123456789012"
+    recording_payload = {
+        "genres": [],
+        "tags": [],
+        "releases": [],
+        "artist-credit": [{"artist": {"id": artist_id, "name": "Artist"}}],
+    }
+    artist_payload = {
+        "genres": [{"name": "house", "count": 5}],
+        "tags": [{"name": "deep house", "count": 2}],
+    }
+
+    def fake_mb_get(url: str, params: dict[str, object]) -> dict[str, object] | None:
+        if url.endswith(f"/recording/{recording_id}"):
+            return recording_payload
+        if url.endswith(f"/artist/{artist_id}"):
+            return artist_payload
+        return None
+
+    with patch("app.metadata.musicbrainz_lookup._mb_get", side_effect=fake_mb_get):
+        info = lookup_recording_genres(recording_id)
+
+    assert info.genre == "House"
+    assert info.subgenre == "Deep House"

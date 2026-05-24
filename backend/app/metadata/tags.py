@@ -11,6 +11,7 @@ from mutagen.id3 import ID3NoHeaderError, TALB, TCON, TIT2, TPE1
 from mutagen.mp3 import MP3
 from mutagen.wave import WAVE
 
+from app.metadata.rename import normalize_track_credits
 from app.metadata.artist_title import resolve_artist_title
 from app.metadata.types import FileTags
 
@@ -72,6 +73,7 @@ def parse_filename_metadata(path: Path) -> FileTags:
 
     embedded = read_tags(path)
     artist, title = resolve_artist_title(left, right, embedded)
+    artist, title, _ = normalize_track_credits(artist, title, None)
     return FileTags(artist=artist, title=title, album=embedded.album, genre=embedded.genre)
 
 

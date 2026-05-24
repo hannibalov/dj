@@ -197,7 +197,7 @@ Spec reference: [dj-library-pipeline-spec.md](../dj-library-pipeline-spec.md) �
 | `processing/` (auto-preferred) | Re-tag/route if needed | → `archive/` |
 | `ready/` or `review/` (wrong keeper) | Demote: copy to `duplicates/` or `archive/`; promote new keeper through TAG → ROUTE | → `archive/` |
 
-Keep `source_path` immutable as audit trail (Phase 1 principle). Update `processing_path` / `final_path` after moves.
+Keep `source_path` immutable as audit trail (Phase 1 principle). Update `processing_path` / `final_path` after moves. Removing the watch copy does **not** delete the track row — re-ingest dedup and duplicate groups rely on persisted `source_path` and fingerprints ([PHASE4 § Watch folder lifecycle](./PHASE4.md#watch-folder-lifecycle)).
 
 ---
 
@@ -253,12 +253,13 @@ Auto rules in `version_priority.py` remain the **default** until the user resolv
 
 ### Metadata edits and duplicates
 
-Editing **artist / title** in the tracks table (`PATCH /tracks/{id}/metadata`):
+Editing **artist / title / genre / subgenre** in the tracks table (`PATCH /tracks/{id}/metadata`):
 
-1. Writes ID3 tags to the on-disk file.
-2. Renames the file using the **naming template** from Settings (same as the TAG step).
+1. Writes ID3 tags to the on-disk file (including genre when changed).
+2. Renames the file using the **naming template** from Settings when artist or title changed (same as the TAG step).
 3. If the standard library name already exists for another track with the **same fingerprint and format family**, the edited copy is moved to `duplicates/<hash>/` and its status becomes `duplicate` — so correcting metadata can surface a duplicate you only noticed after naming.
 4. FLAC + MP3 pairs are kept separate (same fingerprint, different format families).
+5. When only artist/title change and genre/subgenre are still empty, MusicBrainz lookup fills missing genre/subgenre automatically.
 
 ### Duplicate list visibility
 

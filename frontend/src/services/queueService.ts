@@ -1,4 +1,4 @@
-import type { AnalyzeBacklogResult, QueueSummary, RescanResult } from '@/types/queue'
+import type { AnalyzeBacklogResult, GenreBackfillResult, QueueSummary, RescanResult } from '@/types/queue'
 import { api } from './api'
 
 export function fetchQueue(): Promise<QueueSummary> {
@@ -15,6 +15,10 @@ export function analyzeBacklog(): Promise<AnalyzeBacklogResult> {
 
 export function reanalyzeAll(): Promise<AnalyzeBacklogResult> {
   return api.post<AnalyzeBacklogResult>('/queue/reanalyze-all')
+}
+
+export function genreBackfill(): Promise<GenreBackfillResult> {
+  return api.post<GenreBackfillResult>('/queue/genre-backfill')
 }
 
 export function unstickQueue(): Promise<AnalyzeBacklogResult> {

@@ -68,18 +68,25 @@ def test_fingerprint_routes_duplicate_copy_to_duplicates_folder(
 
     preferred = tmp_path / "processing" / "best.mp3"
     duplicate = tmp_path / "processing" / "worse.mp3"
+    watch_best = tmp_path / "watch" / "best.mp3"
+    watch_worse = tmp_path / "watch" / "worse.mp3"
+    watch_best.parent.mkdir(parents=True)
+    watch_best.write_bytes(b"watch-best")
+    watch_worse.write_bytes(b"watch-worse")
     preferred.parent.mkdir(parents=True)
     preferred.write_bytes(b"preferred")
     duplicate.write_bytes(b"duplicate")
+    db_session.add(Setting(key="watch_folder", value=str(tmp_path / "watch")))
+    db_session.commit()
 
     track_a = Track(
-        source_path=str(tmp_path / "watch" / "best.mp3"),
+        source_path=str(watch_best),
         processing_path=str(preferred),
         status=TrackStatus.INGESTED,
         integrated_lufs=-14.0,
     )
     track_b = Track(
-        source_path=str(tmp_path / "watch" / "worse.mp3"),
+        source_path=str(watch_worse),
         processing_path=str(duplicate),
         status=TrackStatus.INGESTED,
         integrated_lufs=-14.0,
@@ -127,3 +134,5 @@ def test_fingerprint_routes_duplicate_copy_to_duplicates_folder(
     assert Path(track_b.final_path).is_file()
     assert track_b.processing_path is None
     assert not duplicate.exists()
+    assert not watch_worse.exists()
+    assert watch_best.is_file()

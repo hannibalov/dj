@@ -186,7 +186,7 @@ Pipeline steps (worker order): **Queued** → **Ingesting** → **Awaiting analy
 
 After **Reanalyze all**, most tracks show **Awaiting analyze** until the worker reaches them; steps advance one job at a time (slow on a Pi with hundreds of tracks).
 
-**Artist / title / genre / subgenre** appear after the **TAG** job (or on **Approve** for genre backfill). Until then those columns may show `—` even if loudness/BPM are filled in.
+**Artist / title / genre / subgenre** appear after the **TAG** job (or via **Genre backfill**, **Approve**, or inline edits). Until then those columns may show empty even if loudness/BPM are filled in.
 
 **Format**, **Quality** (bit depth / sample rate for lossless), and **Bitrate** (MP3 kbps) are read from the on-disk file when the dashboard loads (library copy → processing → watch). **Quality** and **Bitrate** are sortable; each column shows data for one format family only (lossless → Quality, MP3 → Bitrate, the other shows `—`).
 
@@ -210,13 +210,21 @@ The tracks table lists up to **500** newest tracks; the header shows **“table 
 
 | Column / action | Notes |
 |-----------------|--------|
-| **Artist / Title** | Editable inline — blur or Enter saves via `PATCH /tracks/{id}/metadata`, rewrites file tags, renames in place per naming template, clears metadata-review flag |
-| **Genre / Subgenre** | Filled at TAG via MusicBrainz (AcoustID ID or **artist/title search** from filename) + embedded tag fallback; **Approve** backfills if still empty |
+| **Artist / Title / Genre / Subgenre** | Editable inline — blur or Enter saves via `PATCH /tracks/{id}/metadata`, rewrites file tags, renames in place per naming template (artist/title), clears metadata-review flag; re-fetches missing genre/subgenre when only artist/title changed |
 | **Format / Quality / Bitrate** | From mutagen on the current audio path (not stored in DB). Quality = lossless bit depth + sample rate; Bitrate = MP3 kbps only |
 | **Loudness** | From ffmpeg `ebur128` at ANALYZE. Badges: **OK**, **Too quiet** (LUFS below gate), **High peak** (true peak above gate). Thresholds match Settings → Loudness gates |
 | **Reset** | Re-queue ingest |
 | **Delete** | **Failed** tracks only |
 | **Approve** | **Review** tracks → `ready/`; tries MusicBrainz genre lookup if missing |
+
+Dashboard header actions:
+
+| Action | When to use |
+|--------|-------------|
+| **Rescan watch folder** | New files dropped in watch |
+| **Analyze backlog** | Ingested tracks without LUFS |
+| **Reanalyze all** | Full pipeline refresh (analyze → tag → route); worker must be running |
+| **Genre backfill** | Tagged tracks missing genre/subgenre; inline MusicBrainz lookup (no worker queue) |
 
 Header **Clear N failed** removes all tracks in `failed` status (files + DB row).
 
@@ -237,7 +245,7 @@ Common TAG errors:
 | `'artist' not a Frame instance` on **tag** + `.wav` | Old builds used the wrong mutagen API for WAV/AIFF | Upgrade backend image; **Reanalyze all** |
 | Tracks stuck on **Awaiting analyze**, worker **idle**, 0 pending | Earlier job failed; chain stopped | **Recent jobs** → fix cause → **Reanalyze all** or per-track **Reset** |
 | **Analyze backlog** enqueues 0 | Backlog only targets `ingested` tracks **without LUFS** | Use **Reanalyze all** for analyzed-but-stuck tracks |
-| No **genre** / **subgenre** | Empty embedded tags; old image before MB search | Upgrade backend; **Reanalyze all** or **Approve** review tracks |
+| No **genre** / **subgenre** | Empty embedded tags; MB recording has no tags | **Genre backfill** (fast), inline edit in tracks table, or **Reanalyze all** (full refresh) |
 
 ### Operations checklist
 
@@ -258,12 +266,13 @@ Common TAG errors:
 | POST | `/queue/rescan` | Scan watch → ingest |
 | POST | `/queue/analyze-backlog` | Analyze ingested tracks without LUFS |
 | POST | `/queue/reanalyze-all` | Full reprocess: analyze → fingerprint → tag → route |
+| POST | `/queue/genre-backfill` | Re-fetch missing genre/subgenre for tagged tracks (inline MusicBrainz) |
 | POST | `/queue/unstick` | Reset `running` jobs → `pending` |
 | POST | `/queue/clear-failed-jobs` | Delete all failed jobs from history |
 | GET | `/duplicates` | Duplicate groups |
 | POST | `/duplicates/resolve` | Keep one copy; archive others |
 | GET | `/tracks` | List tracks (dashboard uses limit 500; includes `pipeline_stage`, format/bitrate from files) |
-| PATCH | `/tracks/{id}/metadata` | Manual artist/title override → write tags + rename |
+| PATCH | `/tracks/{id}/metadata` | Manual artist/title override → write tags + rename; re-fetch genre if missing |
 | POST | `/tracks/{id}/reset` | Reset track; re-enqueue ingest |
 | POST | `/tracks/{id}/confirm-review` | Move review → ready |
 | DELETE | `/tracks/{id}` | Delete track (failed status only) |

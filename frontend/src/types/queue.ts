@@ -28,3 +28,9 @@ export interface RescanResult {
 
 /** Same shape as rescan — used for analyze-backlog. */
 export type AnalyzeBacklogResult = RescanResult
+
+export interface GenreBackfillResult {
+  status: string
+  enriched: number
+  skipped: number
+}

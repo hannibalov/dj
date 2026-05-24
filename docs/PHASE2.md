@@ -53,6 +53,7 @@ After ingest (`track.status == ingested`), run analysis and route tracks to `rea
 |--------|------|---------|
 | POST | `/queue/analyze-backlog` | Enqueue `ANALYZE` for `ingested` tracks without `integrated_lufs` |
 | POST | `/queue/reanalyze-all` | Full reprocess: `ANALYZE` → `FINGERPRINT` → `TAG` → `ROUTE` with `reprocess` payload |
+| POST | `/queue/genre-backfill` | Re-fetch missing genre/subgenre for tagged tracks (inline MusicBrainz) |
 | POST | `/queue/unstick` | Reset interrupted `running` jobs → `pending` |
 | POST | `/queue/clear-failed-jobs` | Remove failed job rows from history |
 
@@ -64,7 +65,7 @@ After ingest (`track.status == ingested`), run analysis and route tracks to `rea
 | Pipeline stage counts (all tracks in DB) | `frontend/src/components/QueueStatsCard.vue`, `utils/pipelineCounts.ts` |
 | Worker: Processing / Backlogged / Stalled | `frontend/src/components/WorkerStatusCard.vue` |
 | Rescan, Analyze backlog, Reanalyze all | `DashboardPage.vue` |
-| Tracks: BPM, key, energy, **loudness**, artist/title, genre/subgenre, format/quality/bitrate (sortable) | `frontend/src/components/TracksTable.vue` |
+| Tracks: BPM, key, energy, **loudness**, editable artist/title/genre/subgenre, format/quality/bitrate (sortable) | `frontend/src/components/TracksTable.vue` |
 | Delete failed track; filter by stage chip | `TracksTable.vue`, `trackService.ts` |
 | Clear failed jobs / Clear failed tracks | `QueueStatsCard.vue`, `WorkerStatusCard.vue` |
 | Loudness helpers (thresholds from Settings, labels) | `frontend/src/utils/loudness.ts` |

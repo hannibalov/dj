@@ -38,6 +38,12 @@ class AnalyzeBacklogResponse(BaseModel):
     skipped: int
 
 
+class GenreBackfillResponse(BaseModel):
+    status: str
+    enriched: int
+    skipped: int
+
+
 class ClearFailedJobsResponse(BaseModel):
     status: str
     deleted_count: int

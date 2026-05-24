@@ -33,6 +33,8 @@ export function deleteAllFailedTracks(): Promise<TrackDeleteResponse> {
 export interface TrackMetadataUpdate {
   artist: string
   title: string
+  genre?: string | null
+  subgenre?: string | null
 }
 
 export function updateTrackMetadata(

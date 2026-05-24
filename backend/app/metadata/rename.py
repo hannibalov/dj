@@ -29,15 +29,37 @@ def sanitize_filename_part(text: str) -> str:
     return cleaned or "Unknown"
 
 
+def strip_trailing_mix_labels(text: str) -> tuple[str, str | None]:
+    """Remove trailing (Mix Label) suffixes, including repeated ones."""
+    text = text.strip()
+    extracted: str | None = None
+    while True:
+        match = _TRAILING_MIX.match(text)
+        if not match:
+            break
+        mix_label = match.group(2).strip()
+        if mix_label.casefold() in _JUNK_MIX_LABELS:
+            break
+        extracted = mix_label
+        text = match.group(1).strip()
+    return text, extracted
+
+
 def extract_mix_from_title(title: str) -> tuple[str, str | None]:
     """Split 'Title (Club Mix)' into title and mix label."""
-    match = _TRAILING_MIX.match(title.strip())
-    if not match:
-        return title.strip(), None
-    mix_label = match.group(2).strip()
-    if mix_label.casefold() in _JUNK_MIX_LABELS:
-        return title.strip(), None
-    return match.group(1).strip(), mix_label
+    return strip_trailing_mix_labels(title.strip())
+
+
+def normalize_track_credits(
+    artist: str,
+    title: str,
+    mix: str | None = None,
+) -> tuple[str, str, str | None]:
+    """Strip mix/version parentheticals from artist and title; keep mix in its own field."""
+    clean_artist, artist_mix = strip_trailing_mix_labels(artist)
+    clean_title, title_mix = strip_trailing_mix_labels(title)
+    resolved_mix = mix or title_mix or artist_mix
+    return clean_artist, clean_title, resolved_mix
 
 
 def build_library_filename(
@@ -54,10 +76,10 @@ def build_library_filename(
     Uses {title}, {artist}, {mix}, {ext} placeholders in template.
     """
     ext = extension if extension.startswith(".") else f".{extension}"
-    base_title, extracted_mix = extract_mix_from_title(title)
-    mix_label = mix or extracted_mix or "Original Mix"
-    safe_artist = sanitize_filename_part(artist)
-    safe_title = sanitize_filename_part(base_title)
+    clean_artist, clean_title, resolved_mix = normalize_track_credits(artist, title, mix)
+    mix_label = resolved_mix or "Original Mix"
+    safe_artist = sanitize_filename_part(clean_artist)
+    safe_title = sanitize_filename_part(clean_title)
     safe_mix = sanitize_filename_part(mix_label)
 
     pattern = template or DEFAULT_NAMING_TEMPLATE

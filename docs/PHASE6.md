@@ -28,6 +28,7 @@ Items deferred while shipping core pipeline features. **Not part of Phase 6a** u
 | **5b** | Waveform preview | `GET /tracks/:id/waveform` (ffmpeg peaks); embed in compare UI | 7a |
 | **5b** | Audio A/B playback | Explicitly out of scope for v1 | — |
 | **5c** | `POST /queue/tag-backlog` | TAG for `tagged_at IS NULL` in `processing/` | 7b |
+| **5c** | ~~Genre backfill API~~ | Done — `POST /queue/genre-backfill` + dashboard button | — |
 | **5c** | Scheduler retries | Re-enqueue `FAILED` jobs with backoff + cap | 7b |
 | **5c** | Failed job retry count in UI | Jobs table column / chip | 7b |
 | **5d** | Loudness thresholds in Settings UI | Done — `LoudnessSettingsForm` + quality gates (`QualitySettingsForm`); env still sets defaults | — |

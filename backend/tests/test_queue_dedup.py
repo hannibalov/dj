@@ -50,6 +50,26 @@ def test_enqueue_skips_when_already_ingested(db_session: Session, tmp_path: Path
     assert result.skip_reason == SKIP_ALREADY_INGESTED
 
 
+def test_enqueue_skips_when_duplicate_already_routed(db_session: Session, tmp_path: Path) -> None:
+    source = tmp_path / "watch" / "dup.mp3"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"x")
+    final = tmp_path / "duplicates" / "hash123" / "dup.mp3"
+    final.parent.mkdir(parents=True)
+    final.write_bytes(b"x")
+    track = Track(
+        source_path=str(source),
+        final_path=str(final),
+        status=TrackStatus.DUPLICATE,
+    )
+    db_session.add(track)
+    db_session.commit()
+
+    result = QueueService(db_session).enqueue_ingest(str(source))
+    assert result.enqueued is False
+    assert result.skip_reason == SKIP_ALREADY_INGESTED
+
+
 def test_rescan_counts_skipped(db_session: Session, tmp_path: Path) -> None:
     watch = tmp_path / "watch"
     watch.mkdir()
