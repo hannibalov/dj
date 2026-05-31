@@ -111,6 +111,7 @@ sudo apt install ffmpeg libchromaprint-tools
 |------|----------------|
 | ffmpeg | Loudness analysis |
 | fpcalc | Fingerprints & duplicates |
+| yt-dlp | YouTube MP3 downloads (pip: `pip install yt-dlp` or `brew install yt-dlp`) |
 | Essentia | BPM/key (included in Docker backend image; optional for local dev without Docker) |
 
 ### 2. Run (four terminals)

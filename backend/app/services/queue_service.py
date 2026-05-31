@@ -80,6 +80,33 @@ class QueueService:
         self._db.refresh(job)
         return EnqueueResult(job=job, enqueued=True)
 
+    def skip_reason_for_download(self, url: str) -> str | None:
+        active_job = self._db.execute(
+            select(Job).where(
+                Job.source_path == url,
+                Job.job_type == JobType.DOWNLOAD,
+                Job.status.in_(ACTIVE_JOB_STATUSES),
+            )
+        ).scalar_one_or_none()
+        if active_job is not None:
+            return SKIP_ALREADY_QUEUED
+        return None
+
+    def enqueue_download(self, url: str) -> EnqueueResult:
+        skip = self.skip_reason_for_download(url)
+        if skip:
+            return EnqueueResult(job=None, enqueued=False, skip_reason=skip)
+
+        job = Job(
+            job_type=JobType.DOWNLOAD,
+            status=JobStatus.PENDING,
+            source_path=url,
+        )
+        self._db.add(job)
+        self._db.commit()
+        self._db.refresh(job)
+        return EnqueueResult(job=job, enqueued=True)
+
     def skip_reason_for_analyze(self, source_path: str, *, force: bool = False) -> str | None:
         active_job = self._db.execute(
             select(Job).where(

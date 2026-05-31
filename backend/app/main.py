@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import duplicates, health, logs, pipeline, queue, tracks, ws
+from app.api import duplicates, downloads, health, logs, pipeline, queue, tracks, ws
 from app.api import settings as settings_routes
 from app.config import get_settings
 from app.db.session import create_tables, get_engine, init_engine
@@ -35,6 +35,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router, tags=["health"])
     app.include_router(settings_routes.router, prefix="/settings", tags=["settings"])
     app.include_router(queue.router, prefix="/queue", tags=["queue"])
+    app.include_router(downloads.router, prefix="/downloads", tags=["downloads"])
     app.include_router(pipeline.router, prefix="/pipeline", tags=["pipeline"])
     app.include_router(ws.router, tags=["websocket"])
     app.include_router(tracks.router, prefix="/tracks", tags=["tracks"])

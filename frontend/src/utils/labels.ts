@@ -29,7 +29,18 @@ export function jobStatusLabel(status: JobStatus): string {
 }
 
 export function jobTypeLabel(type: JobType): string {
+  if (type === 'download') {
+    return 'Download'
+  }
   return type.charAt(0).toUpperCase() + type.slice(1)
+}
+
+export function jobSourceLabel(job: { job_type: JobType; source_path: string }): string {
+  if (job.job_type === 'download') {
+    const value = job.source_path
+    return value.length > 56 ? `${value.slice(0, 53)}…` : value
+  }
+  return basename(job.source_path)
 }
 
 export function basename(path: string): string {

@@ -4,9 +4,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.fingerprint.version_priority import preferred_track_ids
-from app.metadata.song_group import song_group_key, song_group_label, track_eligible_for_song_review
+from app.metadata.song_group import (
+    canonical_group_key,
+    cluster_song_groups,
+    group_match_type,
+    song_group_label,
+)
 from app.models.enums import TrackStatus
-from app.models.fingerprint import Fingerprint
 from app.models.track import Track
 from app.schemas.song_duplicate import SongDuplicateGroupMember, SongDuplicateGroupResponse
 from app.services.duplicate_service import DuplicateService
@@ -18,7 +22,46 @@ class SongDuplicateService:
         self._db = db
 
     def list_groups(self) -> list[SongDuplicateGroupResponse]:
-        tracks = (
+        tracks = self._load_tracks()
+        result: list[SongDuplicateGroupResponse] = []
+
+        for members in cluster_song_groups(tracks):
+            if not self._is_cross_fingerprint_group(members):
+                continue
+
+            group_key = canonical_group_key(members)
+            label_track = next((t for t in members if t.artist and t.title), members[0])
+            label = song_group_label(label_track) or group_key
+            member_responses = [self._member_response(track) for track in members]
+            mbids = {t.musicbrainz_recording_id for t in members if t.musicbrainz_recording_id}
+
+            result.append(
+                SongDuplicateGroupResponse(
+                    group_key=group_key,
+                    match_type=group_match_type(members),
+                    label=label,
+                    musicbrainz_recording_id=next(iter(mbids)) if len(mbids) == 1 else None,
+                    suggested_keep_track_id=self._suggested_keep(members),
+                    members=member_responses,
+                )
+            )
+
+        result.sort(key=lambda group: group.label.casefold())
+        return result
+
+    def members_for_group_key(self, group_key: str) -> list[Track]:
+        for members in cluster_song_groups(self._load_tracks()):
+            if canonical_group_key(members) != group_key:
+                continue
+            if len(members) < 2:
+                return []
+            if not self._is_cross_fingerprint_group(members):
+                return []
+            return members
+        return []
+
+    def _load_tracks(self) -> list[Track]:
+        return list(
             self._db.execute(
                 select(Track)
                 .options(joinedload(Track.fingerprint))
@@ -29,40 +72,6 @@ class SongDuplicateService:
             .scalars()
             .all()
         )
-
-        by_key: dict[str, list[Track]] = {}
-        for track in tracks:
-            if not track_eligible_for_song_review(track):
-                continue
-            key = song_group_key(track)
-            if key is None:
-                continue
-            by_key.setdefault(key, []).append(track)
-
-        result: list[SongDuplicateGroupResponse] = []
-        for key, members in sorted(by_key.items(), key=lambda item: item[0]):
-            if len(members) < 2:
-                continue
-            if not self._is_cross_fingerprint_group(members):
-                continue
-
-            match_type = "musicbrainz" if key.startswith("mbid:") else "metadata"
-            label_track = next((t for t in members if t.artist and t.title), members[0])
-            label = song_group_label(label_track) or key
-            member_responses = [self._member_response(track) for track in members]
-            suggested = self._suggested_keep(members)
-
-            result.append(
-                SongDuplicateGroupResponse(
-                    group_key=key,
-                    match_type=match_type,
-                    label=label,
-                    musicbrainz_recording_id=label_track.musicbrainz_recording_id,
-                    suggested_keep_track_id=suggested,
-                    members=member_responses,
-                )
-            )
-        return result
 
     @staticmethod
     def _is_cross_fingerprint_group(members: list[Track]) -> bool:
@@ -114,21 +123,3 @@ class SongDuplicateService:
         if len(preferred) == 1:
             return next(iter(preferred))
         return min(preferred)
-
-    def members_for_group_key(self, group_key: str) -> list[Track]:
-        tracks = (
-            self._db.execute(
-                select(Track)
-                .options(joinedload(Track.fingerprint))
-                .where(Track.status != TrackStatus.ARCHIVED)
-            )
-            .unique()
-            .scalars()
-            .all()
-        )
-        members = [t for t in tracks if song_group_key(t) == group_key]
-        if len(members) < 2:
-            return []
-        if not self._is_cross_fingerprint_group(members):
-            return []
-        return members

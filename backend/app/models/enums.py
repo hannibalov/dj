@@ -10,6 +10,7 @@ class JobStatus(StrEnum):
 
 
 class JobType(StrEnum):
+    DOWNLOAD = "download"
     INGEST = "ingest"
     ANALYZE = "analyze"
     FINGERPRINT = "fingerprint"

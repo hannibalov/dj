@@ -10,6 +10,12 @@
 
     <v-row class="mb-4">
       <v-col cols="12">
+        <YouTubeDownloadCard />
+      </v-col>
+    </v-row>
+
+    <v-row class="mb-4">
+      <v-col cols="12">
         <QueueStatsCard
           :tracks="pipeline.tracks"
           :track-summary="pipeline.trackSummary"
@@ -72,6 +78,7 @@ import JobsTable from '@/components/JobsTable.vue'
 import QueueStatsCard from '@/components/QueueStatsCard.vue'
 import TracksTable from '@/components/TracksTable.vue'
 import WorkerStatusCard from '@/components/WorkerStatusCard.vue'
+import YouTubeDownloadCard from '@/components/YouTubeDownloadCard.vue'
 import { usePipelineWebSocket } from '@/composables/usePipelineWebSocket'
 import { usePipelineStore } from '@/stores/pipelineStore'
 import { useSettingsStore } from '@/stores/settingsStore'

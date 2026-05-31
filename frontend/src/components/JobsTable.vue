@@ -15,7 +15,7 @@
         no-data-text="No jobs yet"
       >
         <template #[`item.filename`]="{ item }">
-          {{ basename(item.source_path) }}
+          {{ jobSourceLabel(item) }}
         </template>
         <template #[`item.job_type`]="{ item }">
           {{ jobTypeLabel(item.job_type) }}
@@ -38,7 +38,7 @@
 
 <script setup lang="ts">
 import type { Job } from '@/types/queue'
-import { basename, jobStatusColor, jobStatusLabel, jobTypeLabel } from '@/utils/labels'
+import { jobSourceLabel, jobStatusColor, jobStatusLabel, jobTypeLabel } from '@/utils/labels'
 
 defineProps<{
   jobs: Job[]

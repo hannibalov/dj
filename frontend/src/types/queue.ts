@@ -1,5 +1,5 @@
 export type JobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
-export type JobType = 'ingest' | 'analyze' | 'fingerprint' | 'tag' | 'route'
+export type JobType = 'download' | 'ingest' | 'analyze' | 'fingerprint' | 'tag' | 'route'
 
 export interface Job {
   id: number

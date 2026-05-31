@@ -3,7 +3,7 @@
 
 Sets up Python venv, npm deps, data folders, SQLite, and .env.
 Does NOT install system audio tools — install separately before running the worker:
-  ffmpeg (required), fpcalc/chromaprint (required), Essentia (optional).
+  ffmpeg (required), fpcalc/chromaprint (required), yt-dlp (required for YouTube downloads), Essentia (optional).
 See README.md § System dependencies.
 """
 

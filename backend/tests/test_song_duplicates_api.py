@@ -96,7 +96,9 @@ def test_resolve_song_duplicate_endpoint(
     db_session.add(Fingerprint(track_id=loud.id, fingerprint_hash="hash-loud", duplicate_group_id=None))
     db_session.commit()
 
-    group_key = "mbid:mbid-firestarter"
+    list_response = client.get("/duplicates/songs")
+    assert list_response.status_code == 200
+    group_key = list_response.json()[0]["group_key"]
 
     with patch("app.services.song_duplicate_resolve_service.notify_pipeline_changed"):
         response = client.post(

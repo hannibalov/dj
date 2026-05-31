@@ -111,6 +111,72 @@ def test_list_song_groups_excludes_identical_fingerprints(db_session: Session, t
     assert SongDuplicateService(db_session).list_groups() == []
 
 
+def test_list_song_groups_links_mbid_and_metadata_only_tracks(
+    db_session: Session, tmp_path: Path
+) -> None:
+    tagged_at = datetime.now(UTC)
+    with_mbid = Track(
+        source_path=str(tmp_path / "a.mp3"),
+        status=TrackStatus.REVIEW,
+        artist="The Prodigy",
+        title="Firestarter",
+        mix_version="Original Mix",
+        musicbrainz_recording_id="mbid-firestarter",
+        tagged_at=tagged_at,
+    )
+    without_mbid = Track(
+        source_path=str(tmp_path / "b.mp3"),
+        status=TrackStatus.REVIEW,
+        artist="The Prodigy",
+        title="Firestarter",
+        mix_version=None,
+        tagged_at=tagged_at,
+    )
+    db_session.add_all([with_mbid, without_mbid])
+    db_session.commit()
+
+    db_session.add(
+        Fingerprint(track_id=with_mbid.id, fingerprint_hash="hash-a", duplicate_group_id=None)
+    )
+    db_session.add(
+        Fingerprint(track_id=without_mbid.id, fingerprint_hash="hash-b", duplicate_group_id=None)
+    )
+    db_session.commit()
+
+    groups = SongDuplicateService(db_session).list_groups()
+    assert len(groups) == 1
+    assert len(groups[0].members) == 2
+
+
+def test_list_song_groups_links_tracks_with_and_without_mix_label(
+    db_session: Session, tmp_path: Path
+) -> None:
+    t1 = Track(
+        source_path=str(tmp_path / "a.mp3"),
+        status=TrackStatus.REVIEW,
+        artist="The Prodigy",
+        title="Firestarter",
+        mix_version="Original Mix",
+    )
+    t2 = Track(
+        source_path=str(tmp_path / "b.mp3"),
+        status=TrackStatus.REVIEW,
+        artist="The Prodigy",
+        title="Firestarter",
+        mix_version=None,
+    )
+    db_session.add_all([t1, t2])
+    db_session.commit()
+
+    db_session.add(Fingerprint(track_id=t1.id, fingerprint_hash="hash-1", duplicate_group_id=None))
+    db_session.add(Fingerprint(track_id=t2.id, fingerprint_hash="hash-2", duplicate_group_id=None))
+    db_session.commit()
+
+    groups = SongDuplicateService(db_session).list_groups()
+    assert len(groups) == 1
+    assert len(groups[0].members) == 2
+
+
 def test_list_song_groups_excludes_untagged_tracks(db_session: Session, tmp_path: Path) -> None:
     t1 = Track(
         source_path=str(tmp_path / "a.mp3"),

@@ -59,6 +59,7 @@ The API exposes `pipeline_stage` on each track and `by_pipeline_stage` in `track
 | fpcalc (Chromaprint) | 3 | Manual | Yes (`libchromaprint-tools`) |
 | Essentia | 2 | Docker image | BPM/key in `Dockerfile.backend`; optional for local dev |
 | pyacoustid | 4 | pip (`backend`) | Yes |
+| yt-dlp | 7 | pip (`backend`) | Yes |
 | httpx (MusicBrainz search + genres) | 4 | pip (`backend`) | Yes |
 | AcoustID API key | 4 | `.env` | `.env` / compose |
 
