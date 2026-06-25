@@ -29,6 +29,26 @@ function pipelineStageRank(stage: PipelineStage): number {
   return index === -1 ? PIPELINE_STAGE_ORDER.length : index
 }
 
+function compareDates(
+  a: string | null | undefined,
+  b: string | null | undefined,
+): number {
+  const aTime = a ? Date.parse(a) : Number.NaN
+  const bTime = b ? Date.parse(b) : Number.NaN
+  const aValid = !Number.isNaN(aTime)
+  const bValid = !Number.isNaN(bTime)
+  if (!aValid && !bValid) {
+    return 0
+  }
+  if (!aValid) {
+    return 1
+  }
+  if (!bValid) {
+    return -1
+  }
+  return aTime - bTime
+}
+
 function compareLoudnessTracks(
   a: Track,
   b: Track,
@@ -69,6 +89,7 @@ export function createTrackTableSort(options: TrackTableSortOptions) {
   return {
     filename: (a: Track, b: Track) =>
       compareNullableStrings(basename(a.source_path), basename(b.source_path)),
+    created_at: (a: Track, b: Track) => compareDates(a.created_at, b.created_at),
     artist: (a: Track, b: Track) => compareNullableStrings(a.artist, b.artist),
     title: (a: Track, b: Track) => compareNullableStrings(a.title, b.title),
     genre: (a: Track, b: Track) => compareNullableStrings(a.genre, b.genre),

@@ -34,3 +34,13 @@ export interface GenreBackfillResult {
   enriched: number
   skipped: number
 }
+
+export interface LibrarySyncResult {
+  status: string
+  enqueued: number
+  skipped: number
+  paths_repaired: number
+  metadata_updated: number
+  missing_files: number
+  orphan_files: number
+}

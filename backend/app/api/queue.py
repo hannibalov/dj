@@ -7,10 +7,12 @@ from app.schemas.queue import (
     AnalyzeBacklogResponse,
     ClearFailedJobsResponse,
     GenreBackfillResponse,
+    LibrarySyncResponse,
     QueueResponse,
     RescanResponse,
 )
 from app.services.genre_backfill_service import GenreBackfillService
+from app.services.library_sync_service import LibrarySyncService
 from app.services.queue_service import QueueService
 
 router = APIRouter()
@@ -90,4 +92,24 @@ async def genre_backfill(db: Session = Depends(get_db)) -> GenreBackfillResponse
         status=result.status,
         enriched=result.enriched,
         skipped=result.skipped,
+    )
+
+
+@router.post("/library-sync", response_model=LibrarySyncResponse)
+async def library_sync(db: Session = Depends(get_db)) -> LibrarySyncResponse:
+    result = LibrarySyncService(db).sync_library()
+    await broadcast_snapshot(
+        "Library sync: "
+        f"{result.enqueued} enqueued, {result.paths_repaired} paths repaired, "
+        f"{result.metadata_updated} metadata updated, "
+        f"{result.missing_files} missing, {result.orphan_files} orphan files"
+    )
+    return LibrarySyncResponse(
+        status=result.status,
+        enqueued=result.enqueued,
+        skipped=result.skipped,
+        paths_repaired=result.paths_repaired,
+        metadata_updated=result.metadata_updated,
+        missing_files=result.missing_files,
+        orphan_files=result.orphan_files,
     )

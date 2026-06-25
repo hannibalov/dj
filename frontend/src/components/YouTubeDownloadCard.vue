@@ -6,9 +6,9 @@
     </v-card-title>
     <v-card-text>
       <p class="text-body-2 text-medium-emphasis mb-3">
-        Paste a YouTube URL to download best-available audio as 320 kbps MP3 with loudness
-        normalization (-9 LUFS club master), cover art, and tags into the watch folder. Ensure the worker
-        is running.
+        Paste a YouTube URL to download best-available audio as 320 kbps MP3 with uniform level
+        boost (same gain for the whole track — see docs/YOUTUBE_AUDIO_PROCESSING.md), cover art,
+        and tags. Ensure the worker is running.
       </p>
       <v-form @submit.prevent="submit">
         <v-text-field

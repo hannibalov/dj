@@ -48,6 +48,23 @@ export function basename(path: string): string {
   return parts[parts.length - 1] ?? path
 }
 
+export function formatDateAdded(iso: string | null | undefined): string {
+  if (!iso) {
+    return '—'
+  }
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) {
+    return '—'
+  }
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 export function trackStatusColor(status: TrackStatus): string {
   switch (status) {
     case 'processing':

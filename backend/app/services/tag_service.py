@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.logging import get_logger
 from app.metadata.genre import format_genre_tag
 from app.metadata.genre_resolve import resolve_track_genres
+from app.metadata.known_artists import load_known_artists
 from app.metadata.matcher import match_track_metadata, needs_metadata_review
 from app.metadata.rename import build_library_filename, normalize_track_credits
 from app.metadata.tags import write_tags
@@ -58,6 +59,7 @@ class TagService:
         fp = self._get_fingerprint(track.id)
 
         watch_path = Path(track.source_path)
+        known_artists = load_known_artists(self._db)
         match = match_track_metadata(
             audio_path,
             raw_fingerprint=fp.raw_fingerprint if fp else None,
@@ -66,6 +68,7 @@ class TagService:
             confidence_threshold=settings.tag_confidence_threshold,
             reprocess=reprocess,
             filename_hint_path=watch_path if watch_path.is_file() else None,
+            known_artists=known_artists,
         )
 
         threshold = settings.tag_confidence_threshold

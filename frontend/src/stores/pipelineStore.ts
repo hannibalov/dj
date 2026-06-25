@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 import { fetchPipelineStatus } from '@/services/pipelineService'
-import { analyzeBacklog, genreBackfill, reanalyzeAll, rescanQueue } from '@/services/queueService'
+import { analyzeBacklog, genreBackfill, librarySync, reanalyzeAll, rescanQueue } from '@/services/queueService'
 import type { PipelineSnapshot } from '@/types/pipeline'
 
 import { useSnackbarStore } from './snackbarStore'
@@ -106,6 +106,25 @@ export const usePipelineStore = defineStore('pipeline', () => {
     }
   }
 
+  async function runLibrarySync(): Promise<void> {
+    loading.value = true
+    try {
+      const result = await librarySync()
+      snackbar.show(
+        `Library sync: ${result.enqueued} enqueued, ${result.paths_repaired} paths repaired, ` +
+          `${result.metadata_updated} metadata updated, ${result.missing_files} missing, ` +
+          `${result.orphan_files} orphan files.`,
+        { color: 'success' },
+      )
+    } catch (e) {
+      snackbar.show(e instanceof Error ? e.message : 'Library sync failed', {
+        color: 'error',
+      })
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     snapshot,
     loading,
@@ -122,6 +141,7 @@ export const usePipelineStore = defineStore('pipeline', () => {
     runAnalyzeBacklog,
     runReanalyzeAll,
     runGenreBackfill,
+    runLibrarySync,
     applySnapshot,
   }
 })

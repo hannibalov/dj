@@ -1,7 +1,9 @@
 """Resolve Artist - Title vs Title - Artist from filename segments."""
 
 import re
+from collections.abc import Collection
 
+from app.metadata.known_artists import match_known_artist
 from app.metadata.types import FileTags
 
 _TITLE_MARKERS = (
@@ -58,15 +60,22 @@ def resolve_artist_title(
     left: str,
     right: str,
     embedded: FileTags | None = None,
+    *,
+    known_artists: Collection[str] | None = None,
 ) -> tuple[str, str]:
     """
     Decide which side is artist vs title.
 
-    Uses embedded tags when present, then structural heuristics.
-    For ambiguous single-token pairs with no tags, assumes common download
-    order Title - Artist (e.g. Wonderwall - Oasis).
+    Uses embedded tags when present, then known library artists, then
+    structural heuristics. For ambiguous single-token pairs with no tags,
+    assumes common download order Artist - Title.
     """
     left, right = left.strip(), right.strip()
+
+    if known_artists:
+        resolved = _resolve_with_known_artists(left, right, known_artists)
+        if resolved is not None:
+            return resolved
 
     if embedded:
         if embedded.artist:
@@ -93,6 +102,28 @@ def resolve_artist_title(
     # Ambiguous without tags — prefer Artist - Title (common in DJ downloads).
     # Authoritative order comes from MusicBrainz disambiguation in matcher.py.
     return artist_title
+
+
+def _resolve_with_known_artists(
+    left: str,
+    right: str,
+    known_artists: Collection[str],
+) -> tuple[str, str] | None:
+    left_match = match_known_artist(left, known_artists)
+    right_match = match_known_artist(right, known_artists)
+
+    if left_match and not right_match:
+        return left_match, right
+    if right_match and not left_match:
+        return right_match, left
+    if left_match and right_match:
+        score_forward = _score_artist_title_pair(left_match, right)
+        score_swap = _score_artist_title_pair(right_match, left)
+        if score_swap > score_forward:
+            return right_match, left
+        if score_forward > score_swap:
+            return left_match, right
+    return None
 
 
 def embedded_tags_swapped(embedded: FileTags, resolved: FileTags) -> bool:

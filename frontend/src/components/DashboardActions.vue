@@ -11,6 +11,16 @@
       <span class="d-flex flex-wrap ga-2">
         <v-btn
           color="primary"
+          variant="outlined"
+          prepend-icon="mdi-database-sync"
+          :loading="loading"
+          title="Scan all library folders, repair stale paths, enqueue new watch files, and refresh artist/title from filenames using known artists"
+          @click="$emit('library-sync')"
+        >
+          Sync library
+        </v-btn>
+        <v-btn
+          color="primary"
           prepend-icon="mdi-folder-search"
           :loading="loading"
           @click="$emit('rescan')"
@@ -58,6 +68,7 @@ defineProps<{
 
 defineEmits<{
   rescan: []
+  'library-sync': []
   'analyze-backlog': []
   'reanalyze-all': []
   'genre-backfill': []

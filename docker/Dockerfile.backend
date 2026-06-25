@@ -32,7 +32,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libfftw3-double3 libfftw3-single3 \
     libavcodec59 libavformat59 libavutil57 libswresample4 \
     libsamplerate0 libtag1v5 libyaml-0-2 \
+    libmp3lame0 \
+    nodejs npm \
     && rm -rf /var/lib/apt/lists/*
+
+# Some Debian packages install the binary as `nodejs` instead of `node`.
+RUN if [ ! -x "$(command -v node 2>/dev/null)" ] && [ -x "$(command -v nodejs 2>/dev/null)" ]; then \
+    ln -s "$(command -v nodejs)" /usr/bin/node; \
+    fi
 
 COPY --from=essentia-builder /usr/local/lib/libessentia.so* /usr/local/lib/
 COPY --from=essentia-builder /usr/local/lib/python3.11/site-packages/essentia /usr/local/lib/python3.11/site-packages/essentia

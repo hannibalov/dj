@@ -44,6 +44,16 @@ class GenreBackfillResponse(BaseModel):
     skipped: int
 
 
+class LibrarySyncResponse(BaseModel):
+    status: str
+    enqueued: int
+    skipped: int
+    paths_repaired: int
+    metadata_updated: int
+    missing_files: int
+    orphan_files: int
+
+
 class ClearFailedJobsResponse(BaseModel):
     status: str
     deleted_count: int

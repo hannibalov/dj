@@ -99,6 +99,22 @@ Edit `docker-compose.yml` under `api`, `worker`, and `watcher`:
       - /home/pi/nextcloud/Music/Inbox:/data/watch
 ```
 
+### Volume permissions on the Pi
+
+If you run `docker compose` with `sudo`, the host `data/` directories and files can end up owned by `root:root`. That is why adding `user: "33:33"` inside the compose file can make the container fail: the container process runs as `www-data` and needs a writable host volume.
+
+Before starting the stack, make sure the data tree is owned by the same UID/GID and has group write permissions:
+
+```bash
+sudo chown -R 33:33 data
+find data -type d -exec chmod 775 {} +
+find data -type f -exec chmod 664 {} +
+```
+
+If you mount an external folder into `/data/watch`, make sure the host mount also allows access for UID/GID `33:33`.
+
+Avoid using `user: "33:33"` unless the mounted host directories are already compatible with that UID/GID. If `./data` is root-owned and not group-writable, a `www-data` container user may be unable to open or create files.
+
 ### Upgrade after you push a new image from the Mac
 
 ```bash

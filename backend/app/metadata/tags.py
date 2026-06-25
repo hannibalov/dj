@@ -1,5 +1,6 @@
 """Read and write audio tags via mutagen."""
 
+from collections.abc import Collection
 from pathlib import Path
 from typing import Callable
 
@@ -11,7 +12,7 @@ from mutagen.id3 import ID3NoHeaderError, TALB, TCON, TIT2, TPE1
 from mutagen.mp3 import MP3
 from mutagen.wave import WAVE
 
-from app.metadata.rename import normalize_track_credits
+from app.metadata.rename import normalize_track_credits, strip_trailing_mix_labels
 from app.metadata.artist_title import resolve_artist_title
 from app.metadata.types import FileTags
 
@@ -60,9 +61,14 @@ def write_tags(
         _write_easy(path, artist=artist, title=title, album=album, genre=genre)
 
 
-def parse_filename_metadata(path: Path) -> FileTags:
+def parse_filename_metadata(
+    path: Path,
+    *,
+    known_artists: Collection[str] | None = None,
+) -> FileTags:
     """Parse 'Artist - Title' or 'Title - Artist' from basename using tags + heuristics."""
     stem = path.stem
+    stem, _ = strip_trailing_mix_labels(stem)
     if " - " not in stem:
         return FileTags()
 
@@ -72,7 +78,12 @@ def parse_filename_metadata(path: Path) -> FileTags:
         return FileTags()
 
     embedded = read_tags(path)
-    artist, title = resolve_artist_title(left, right, embedded)
+    artist, title = resolve_artist_title(
+        left,
+        right,
+        embedded,
+        known_artists=known_artists,
+    )
     artist, title, _ = normalize_track_credits(artist, title, None)
     return FileTags(artist=artist, title=title, album=embedded.album, genre=embedded.genre)
 

@@ -111,7 +111,7 @@ sudo apt install ffmpeg libchromaprint-tools
 |------|----------------|
 | ffmpeg | Loudness analysis |
 | fpcalc | Fingerprints & duplicates |
-| yt-dlp | YouTube MP3 downloads (pip: `pip install yt-dlp` or `brew install yt-dlp`) |
+| yt-dlp | YouTube MP3 downloads (pip: `pip install yt-dlp` or `brew install yt-dlp`); processing details in [docs/YOUTUBE_AUDIO_PROCESSING.md](./docs/YOUTUBE_AUDIO_PROCESSING.md) |
 | Essentia | BPM/key (included in Docker backend image; optional for local dev without Docker) |
 
 ### 2. Run (four terminals)
@@ -170,7 +170,8 @@ Open **http://\<host\>:5173** (Docker) or **http://localhost:5173** (local dev).
 
 | Button | What it does |
 |--------|----------------|
-| **Rescan watch folder** | Enqueue `INGEST` for new files in `watch/` |
+| **Sync library** | Scan all folders (`watch/`, `processing/`, `ready/`, `review/`, `duplicates/`, `archive/`, `failed/`), repair stale DB paths, enqueue new watch files, refresh artist/title from filenames using known library artists |
+| **Rescan watch folder** | Enqueue `INGEST` for new files in `watch/` only |
 | **Analyze backlog** | Enqueue `ANALYZE` for `ingested` tracks that have no LUFS yet |
 | **Reanalyze all** | Full reprocess for every track with audio in `processing/` or `ready/`/`review/`: clears analysis + tag metadata, then **ANALYZE → FINGERPRINT → TAG → ROUTE** (requires **worker** running) |
 
@@ -222,6 +223,7 @@ Dashboard header actions:
 
 | Action | When to use |
 |--------|-------------|
+| **Sync library** | Reconcile DB with all folders; repair paths; fix reversed/misspelled artist names using catalog from tagged tracks |
 | **Rescan watch folder** | New files dropped in watch |
 | **Analyze backlog** | Ingested tracks without LUFS |
 | **Reanalyze all** | Full pipeline refresh (analyze → tag → route); worker must be running |

@@ -1,5 +1,6 @@
 """Combine AcoustID, MusicBrainz, embedded tags, and filename hints into match metadata."""
 
+from collections.abc import Collection
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -34,6 +35,7 @@ def match_track_metadata(
     confidence_threshold: float,
     reprocess: bool = False,
     filename_hint_path: Path | None = None,
+    known_artists: Collection[str] | None = None,
 ) -> MetadataMatch | None:
     """Return best metadata match or None when nothing usable was found."""
     candidates: list[MetadataMatch] = []
@@ -63,7 +65,7 @@ def match_track_metadata(
         if mb is not None:
             candidates.append(_from_musicbrainz(mb))
 
-    parsed = _best_filename_match(*filename_paths)
+    parsed = _best_filename_match(*filename_paths, known_artists=known_artists)
     embedded_raw = read_tags(path)
 
     if not reprocess:
@@ -170,12 +172,15 @@ def _filename_segments(*paths: Path) -> tuple[str, str] | None:
     return best
 
 
-def _best_filename_match(*paths: Path) -> FileTags:
+def _best_filename_match(
+    *paths: Path,
+    known_artists: Collection[str] | None = None,
+) -> FileTags:
     """Pick the strongest artist/title parse among one or more file paths."""
     best: FileTags = FileTags(artist=None, title=None, album=None)
     best_score = -1.0
     for path in paths:
-        parsed = parse_filename_metadata(path)
+        parsed = parse_filename_metadata(path, known_artists=known_artists)
         if not parsed.artist or not parsed.title:
             continue
         score = len(parsed.artist) + len(parsed.title)

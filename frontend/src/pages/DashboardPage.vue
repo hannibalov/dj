@@ -3,6 +3,7 @@
     <DashboardActions
       :loading="pipeline.loading"
       @rescan="pipeline.rescan()"
+      @library-sync="pipeline.runLibrarySync()"
       @analyze-backlog="pipeline.runAnalyzeBacklog()"
       @reanalyze-all="pipeline.runReanalyzeAll()"
       @genre-backfill="pipeline.runGenreBackfill()"

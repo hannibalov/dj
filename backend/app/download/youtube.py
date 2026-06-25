@@ -5,14 +5,15 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from app.download.linear_gain import LinearGainError, apply_linear_gain
+from app.logging import get_logger
+
+logger = get_logger("ROUTER")
+
 # Best available YouTube audio, then transcode for the DJ library pipeline.
 _YOUTUBE_BEST_AUDIO_FORMAT = "bestaudio/best"
 _MP3_TARGET_BITRATE = "320K"
 _OUTPUT_SAMPLE_RATE_HZ = 44100
-# Club-oriented loudness: hot masters around -9 LUFS with tight dynamics.
-_LOUDNORM_TARGET_LUFS = -9.0
-_LOUDNORM_TRUE_PEAK = -0.5
-_LOUDNORM_LRA = 7.0
 
 _YOUTUBE_HOST = re.compile(
     r"^https?://(?:"
@@ -35,19 +36,17 @@ def is_youtube_url(url: str) -> bool:
 
 
 def ffmpeg_postprocessor_args() -> str:
-    """ffmpeg flags for club-style loudness normalization and DJ-friendly sample rate."""
-    loudnorm = (
-        f"loudnorm=I={_LOUDNORM_TARGET_LUFS:.1f}:"
-        f"TP={_LOUDNORM_TRUE_PEAK:.1f}:"
-        f"LRA={_LOUDNORM_LRA:.0f}"
+    """ffmpeg transcode flags for yt-dlp — no loudness filters (gain is applied later)."""
+    return (
+        f"-ar {_OUTPUT_SAMPLE_RATE_HZ} "
+        f"-c:a libmp3lame -b:a {_MP3_TARGET_BITRATE.lower()}"
     )
-    return f"-af {loudnorm} -ar {_OUTPUT_SAMPLE_RATE_HZ}"
 
 
 def build_youtube_download_command(url: str, output_dir: Path) -> list[str]:
-    """Build yt-dlp argv for a single YouTube video → normalized 320k MP3."""
+    """Build yt-dlp argv for a single YouTube video → 320k MP3 in watch folder."""
     output_template = str(output_dir / "%(artist,channel,uploader)s - %(title)s.%(ext)s")
-    return [
+    cmd: list[str] = [
         "yt-dlp",
         "--no-playlist",
         "-f",
@@ -74,6 +73,13 @@ def build_youtube_download_command(url: str, output_dir: Path) -> list[str]:
         "after_move:filepath",
         url.strip(),
     ]
+
+    if shutil.which("node"):
+        cmd[1:1] = ["--js-runtimes", "node"]
+    elif shutil.which("deno"):
+        cmd[1:1] = ["--js-runtimes", "deno"]
+
+    return cmd
 
 
 def download_youtube_audio(
@@ -119,5 +125,18 @@ def download_youtube_audio(
     output_path = Path(lines[-1])
     if not output_path.is_file():
         raise YouTubeDownloadError(f"Downloaded file missing: {output_path}")
+
+    try:
+        gain_result = apply_linear_gain(output_path, timeout_seconds=timeout_seconds)
+    except LinearGainError as exc:
+        raise YouTubeDownloadError(f"Linear gain failed: {exc}") from exc
+
+    logger.info(
+        "youtube_download_gain",
+        path=str(output_path),
+        gain_db=gain_result.gain_db,
+        applied=gain_result.applied,
+        measured_lufs=gain_result.measured_lufs,
+    )
 
     return output_path

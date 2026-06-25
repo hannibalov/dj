@@ -90,7 +90,8 @@ Priority order for **artist / title**:
 1. **AcoustID** fingerprint lookup (requires `DJ_ACOUSTID_API_KEY` + Chromaprint fingerprint).
 2. **Embedded tags** (ID3/Vorbis), with YouTube-style junk normalized (`backend/app/metadata/normalize.py`).
 3. **Filename** from the watch-folder drop or processing basename (`Title - Artist` or `Artist - Title`).
-4. **MusicBrainz disambiguation** — when the filename has `Artist - Title` or `Title - Artist`, queries MusicBrainz with **both** orderings and picks the best match (duration + segment alignment). Canonical artist/title from MusicBrainz; source: `musicbrainz`. Beats filename heuristics and unverified embedded tags.
+4. **Known library artists** — when the filename has two segments, compare them against artist names already stored on tagged / ready tracks (exact, aligned, or close misspellings) to fix reversed or typo'd names before MusicBrainz.
+5. **MusicBrainz disambiguation** — when the filename has `Artist - Title` or `Title - Artist`, queries MusicBrainz with **both** orderings and picks the best match (duration + segment alignment). Canonical artist/title from MusicBrainz; source: `musicbrainz`. Beats filename heuristics and unverified embedded tags.
 
 Low-confidence or no match sets `needs_metadata_review` and routes to `review/` even when loudness/quality are OK.
 
@@ -183,6 +184,7 @@ Terminal statuses mirror `TrackStatus`. While `status` is `ingested`, the API ex
 | PATCH | `/tracks/{id}/metadata` | Body: `{ "artist", "title", "genre?", "subgenre?" }` — write tags, rename file, set `tagged_at`; write genre/subgenre when changed; re-fetch missing genre/subgenre when only artist/title changed |
 | POST | `/tracks/{id}/confirm-review` | Approve `review/` → `ready/`; MusicBrainz genre backfill if missing |
 | POST | `/queue/genre-backfill` | Re-fetch missing genre/subgenre for tagged tracks (inline MB lookup) |
+| POST | `/queue/library-sync` | Scan all library folders; repair stale paths; enqueue new watch files; refresh artist/title from filenames using known library artists |
 
 ---
 

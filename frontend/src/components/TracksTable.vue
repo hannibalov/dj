@@ -32,6 +32,9 @@
         <template #[`item.filename`]="{ item }">
           {{ basename(item.source_path) }}
         </template>
+        <template #[`item.created_at`]="{ item }">
+          <span class="text-caption">{{ formatDateAdded(item.created_at) }}</span>
+        </template>
         <template #[`item.artist`]="{ item }">
           <v-text-field
             :model-value="draftArtist(item)"
@@ -207,7 +210,7 @@ import { usePipelineStore } from '@/stores/pipelineStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useSnackbarStore } from '@/stores/snackbarStore'
 import type { Track } from '@/types/track'
-import { basename } from '@/utils/labels'
+import { basename, formatDateAdded } from '@/utils/labels'
 import {
   PIPELINE_STAGE_ORDER,
   pipelineStageColor,
@@ -361,6 +364,7 @@ const headers = computed(() => {
 
   return [
     { title: 'File', key: 'filename', sortRaw: sort.filename },
+    { title: 'Date added', key: 'created_at', sortRaw: sort.created_at, width: '160px' },
     { title: 'Artist', key: 'artist', sortRaw: sort.artist },
     { title: 'Title', key: 'title', sortRaw: sort.title },
     { title: 'Genre', key: 'genre', sortRaw: sort.genre },

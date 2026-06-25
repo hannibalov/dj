@@ -16,6 +16,13 @@ def test_resolve_ambiguous_single_word_pair_defaults_artist_first() -> None:
     assert title == "Cola"
 
 
+def test_resolve_artist_title_uses_known_artists_before_heuristics() -> None:
+    known = frozenset({"CamelPhat"})
+    artist, title = resolve_artist_title("Cola", "CamelPhat", known_artists=known)
+    assert artist == "CamelPhat"
+    assert title == "Cola"
+
+
 def test_resolve_artist_title_multiword() -> None:
     artist, title = resolve_artist_title("Jan Blomqvist", "The Space In Between")
     assert artist == "Jan Blomqvist"

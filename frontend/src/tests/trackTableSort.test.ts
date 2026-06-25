@@ -69,4 +69,12 @@ describe('trackTableSort', () => {
     expect(compareNullableStrings('House', null)).toBeLessThan(0)
     expect(compareNullableStrings(null, 'House')).toBeGreaterThan(0)
   })
+
+  it('sorts by created_at chronologically', () => {
+    const sort = createTrackTableSort({ loudnessThresholds: { lufs: -18, peak: 3 } })
+    const older = track({ created_at: '2024-01-01T10:00:00Z' })
+    const newer = track({ created_at: '2024-06-01T10:00:00Z' })
+    expect(sort.created_at(older, newer)).toBeLessThan(0)
+    expect(sort.created_at(newer, older)).toBeGreaterThan(0)
+  })
 })
