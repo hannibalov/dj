@@ -36,32 +36,22 @@
           <span class="text-caption">{{ formatDateAdded(item.created_at) }}</span>
         </template>
         <template #[`item.artist`]="{ item }">
-          <v-text-field
+          <EditableMetadataField
             :model-value="draftArtist(item)"
-            density="compact"
-            variant="plain"
-            hide-details
             placeholder="Artist"
-            class="metadata-field"
             :disabled="metadataSavingId === item.id"
             @update:model-value="(v) => setDraft(item, 'artist', v)"
             @blur="() => saveMetadata(item)"
-            @keyup.enter="($event.target as HTMLInputElement)?.blur()"
           />
         </template>
         <template #[`item.title`]="{ item }">
           <div class="d-flex align-center flex-wrap ga-1">
-            <v-text-field
+            <EditableMetadataField
               :model-value="draftTitle(item)"
-              density="compact"
-              variant="plain"
-              hide-details
               placeholder="Title"
-              class="metadata-field"
               :disabled="metadataSavingId === item.id"
               @update:model-value="(v) => setDraft(item, 'title', v)"
               @blur="() => saveMetadata(item)"
-              @keyup.enter="($event.target as HTMLInputElement)?.blur()"
             />
             <v-chip
               v-if="item.needs_metadata_review"
@@ -73,31 +63,21 @@
           </div>
         </template>
         <template #[`item.genre`]="{ item }">
-          <v-text-field
+          <EditableMetadataField
             :model-value="draftGenre(item)"
-            density="compact"
-            variant="plain"
-            hide-details
             placeholder="Genre"
-            class="metadata-field"
             :disabled="metadataSavingId === item.id"
             @update:model-value="(v) => setDraft(item, 'genre', v)"
             @blur="() => saveMetadata(item)"
-            @keyup.enter="($event.target as HTMLInputElement)?.blur()"
           />
         </template>
         <template #[`item.subgenre`]="{ item }">
-          <v-text-field
+          <EditableMetadataField
             :model-value="draftSubgenre(item)"
-            density="compact"
-            variant="plain"
-            hide-details
             placeholder="Subgenre"
-            class="metadata-field"
             :disabled="metadataSavingId === item.id"
             @update:model-value="(v) => setDraft(item, 'subgenre', v)"
             @blur="() => saveMetadata(item)"
-            @keyup.enter="($event.target as HTMLInputElement)?.blur()"
           />
         </template>
         <template #[`item.status`]="{ item }">
@@ -200,6 +180,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
+import EditableMetadataField from '@/components/EditableMetadataField.vue'
 import {
   confirmTrackReview,
   deleteFailedTrack,
@@ -435,16 +416,5 @@ async function onConfirmReview(trackId: number): Promise<void> {
   align-items: flex-start;
   gap: 2px;
   min-width: 140px;
-}
-
-.metadata-field {
-  min-width: 120px;
-  max-width: 220px;
-}
-
-.metadata-field :deep(.v-field__input) {
-  padding-top: 0;
-  padding-bottom: 0;
-  min-height: 28px;
 }
 </style>

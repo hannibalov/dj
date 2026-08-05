@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -56,7 +57,7 @@ def test_lookup_recording_genres_falls_back_to_release() -> None:
         "tags": [{"name": "techno", "count": 2}],
     }
 
-    def fake_mb_get(url: str, params: dict[str, object]) -> dict[str, object] | None:
+    def fake_mb_get(url: str, params: Mapping[str, str | int]) -> Mapping[str, object] | None:
         if url.endswith(f"/recording/{recording_id}"):
             return recording_payload
         if url.endswith(f"/release/{release_id}"):
@@ -84,7 +85,7 @@ def test_lookup_recording_genres_falls_back_to_artist() -> None:
         "tags": [{"name": "deep house", "count": 2}],
     }
 
-    def fake_mb_get(url: str, params: dict[str, object]) -> dict[str, object] | None:
+    def fake_mb_get(url: str, params: Mapping[str, str | int]) -> Mapping[str, object] | None:
         if url.endswith(f"/recording/{recording_id}"):
             return recording_payload
         if url.endswith(f"/artist/{artist_id}"):

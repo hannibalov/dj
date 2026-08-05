@@ -34,12 +34,8 @@ def test_list_song_groups_by_musicbrainz_recording_id(db_session: Session, tmp_p
     db_session.add_all([t1, t2])
     db_session.commit()
 
-    db_session.add(
-        Fingerprint(track_id=t1.id, fingerprint_hash="hash-a", duplicate_group_id=None)
-    )
-    db_session.add(
-        Fingerprint(track_id=t2.id, fingerprint_hash="hash-b", duplicate_group_id=None)
-    )
+    db_session.add(Fingerprint(track_id=t1.id, fingerprint_hash="hash-a", duplicate_group_id=None))
+    db_session.add(Fingerprint(track_id=t2.id, fingerprint_hash="hash-b", duplicate_group_id=None))
     db_session.commit()
 
     groups = SongDuplicateService(db_session).list_groups()
@@ -80,7 +76,9 @@ def test_list_song_groups_by_metadata_when_no_mbid(db_session: Session, tmp_path
     assert groups[0].group_key.startswith("meta:")
 
 
-def test_list_song_groups_excludes_identical_fingerprints(db_session: Session, tmp_path: Path) -> None:
+def test_list_song_groups_excludes_identical_fingerprints(
+    db_session: Session, tmp_path: Path
+) -> None:
     tagged_at = datetime.now(UTC)
     t1 = Track(
         source_path=str(tmp_path / "a.mp3"),
@@ -100,12 +98,8 @@ def test_list_song_groups_excludes_identical_fingerprints(db_session: Session, t
     db_session.commit()
 
     same_hash = "identical-hash"
-    db_session.add(
-        Fingerprint(track_id=t1.id, fingerprint_hash=same_hash, duplicate_group_id=None)
-    )
-    db_session.add(
-        Fingerprint(track_id=t2.id, fingerprint_hash=same_hash, duplicate_group_id=None)
-    )
+    db_session.add(Fingerprint(track_id=t1.id, fingerprint_hash=same_hash, duplicate_group_id=None))
+    db_session.add(Fingerprint(track_id=t2.id, fingerprint_hash=same_hash, duplicate_group_id=None))
     db_session.commit()
 
     assert SongDuplicateService(db_session).list_groups() == []

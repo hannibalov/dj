@@ -1,12 +1,13 @@
 from datetime import UTC, datetime
 from pathlib import Path
 
+from sqlalchemy.orm import Session
+
 from app.metadata.artist_title import resolve_artist_title
 from app.metadata.known_artists import load_known_artists, match_known_artist
 from app.metadata.tags import parse_filename_metadata
 from app.models.enums import TrackStatus
 from app.models.track import Track
-from app.services.library_sync_service import LibrarySyncService
 
 
 def test_match_known_artist_exact_and_fuzzy() -> None:
@@ -48,7 +49,7 @@ def test_parse_filename_metadata_with_known_artists(tmp_path: Path) -> None:
     assert parsed.title == "Wonderwall"
 
 
-def test_load_known_artists_from_tagged_tracks(db_session, tmp_path: Path) -> None:
+def test_load_known_artists_from_tagged_tracks(db_session: Session, tmp_path: Path) -> None:
     db_session.add(
         Track(
             source_path=str(tmp_path / "a.mp3"),

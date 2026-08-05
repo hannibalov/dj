@@ -74,3 +74,9 @@ warn_unused_ignores = true
 module = "tests.*"
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+# mutagen ships no type stubs; every call into it is necessarily "untyped".
+module = "app.metadata.tags"
+disallow_untyped_calls = false

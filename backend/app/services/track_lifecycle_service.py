@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.logging import get_logger
+from app.metadata.genre_resolve import apply_resolved_genres_to_file, resolve_track_genres
 from app.models.enums import JobStatus, TrackStatus
 from app.models.fingerprint import Fingerprint
 from app.models.job import Job
@@ -14,7 +15,6 @@ from app.schemas.settings import SettingsResponse
 from app.services.notify import notify_pipeline_changed
 from app.services.queue_service import ACTIVE_JOB_STATUSES, QueueService
 from app.services.settings_service import SettingsService
-from app.metadata.genre_resolve import apply_resolved_genres_to_file, resolve_track_genres
 from app.utils.workspace_files import (
     move_into_destination,
     path_is_under_root,
@@ -240,9 +240,7 @@ class TrackLifecycleService:
             remove_workspace_file(candidate)
 
     def _delete_jobs_for_source(self, source_path: str) -> None:
-        jobs = (
-            self._db.execute(select(Job).where(Job.source_path == source_path)).scalars().all()
-        )
+        jobs = self._db.execute(select(Job).where(Job.source_path == source_path)).scalars().all()
         for job in jobs:
             self._db.delete(job)
 

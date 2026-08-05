@@ -1,13 +1,15 @@
 from pathlib import Path
 from unittest.mock import patch
 
+from sqlalchemy.orm import Session
+
 from app.metadata.musicbrainz_lookup import RecordingGenreInfo
 from app.models.enums import TrackStatus
 from app.models.track import Track
 from app.services.genre_backfill_service import GenreBackfillService
 
 
-def test_backfill_missing_genres_enriches_tracks(db_session, tmp_path: Path) -> None:
+def test_backfill_missing_genres_enriches_tracks(db_session: Session, tmp_path: Path) -> None:
     audio = tmp_path / "ready" / "Song - Artist (Original Mix).mp3"
     audio.parent.mkdir(parents=True)
     audio.write_bytes(b"audio")
@@ -47,7 +49,9 @@ def test_backfill_missing_genres_enriches_tracks(db_session, tmp_path: Path) -> 
     mock_apply.assert_called_once()
 
 
-def test_backfill_missing_genres_skips_when_no_genres_found(db_session, tmp_path: Path) -> None:
+def test_backfill_missing_genres_skips_when_no_genres_found(
+    db_session: Session, tmp_path: Path
+) -> None:
     audio = tmp_path / "ready" / "Song - Artist (Original Mix).mp3"
     audio.parent.mkdir(parents=True)
     audio.write_bytes(b"audio")
@@ -77,7 +81,7 @@ def test_backfill_missing_genres_skips_when_no_genres_found(db_session, tmp_path
     mock_apply.assert_not_called()
 
 
-def test_backfill_missing_genres_fills_subgenre_only(db_session, tmp_path: Path) -> None:
+def test_backfill_missing_genres_fills_subgenre_only(db_session: Session, tmp_path: Path) -> None:
     audio = tmp_path / "ready" / "Song - Artist (Original Mix).mp3"
     audio.parent.mkdir(parents=True)
     audio.write_bytes(b"audio")

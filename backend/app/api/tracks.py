@@ -4,7 +4,11 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.schemas.track import TrackResponse
 from app.schemas.track_actions import TrackActionResponse, TrackDeleteResponse
-from app.schemas.track_metadata import TrackMetadataUpdate
+from app.schemas.track_metadata import (
+    RenameArtistRequest,
+    RenameArtistResponse,
+    TrackMetadataUpdate,
+)
 from app.services.track_lifecycle_service import TrackLifecycleError, TrackLifecycleService
 from app.services.track_metadata_service import TrackMetadataError, TrackMetadataService
 from app.services.track_service import TrackService
@@ -30,6 +34,25 @@ def delete_all_failed_tracks(db: Session = Depends(get_db)) -> TrackDeleteRespon
         status="ok",
         message=f"Removed {count} failed track(s)",
         deleted_count=count,
+    )
+
+
+@router.post("/rename-artist", response_model=RenameArtistResponse)
+def rename_artist(
+    body: RenameArtistRequest,
+    db: Session = Depends(get_db),
+) -> RenameArtistResponse:
+    try:
+        result = TrackMetadataService(db).rename_artist_everywhere(
+            body.old_artist,
+            body.new_artist,
+        )
+    except TrackMetadataError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return RenameArtistResponse(
+        status=result.status,
+        matched=result.matched,
+        updated=result.updated,
     )
 
 
@@ -61,6 +84,19 @@ def update_track_metadata(
         status="ok",
         track=TrackService(db)._to_response(track),
         message="Tags updated",
+    )
+
+
+@router.post("/{track_id}/swap-artist-title", response_model=TrackActionResponse)
+def swap_artist_title(track_id: int, db: Session = Depends(get_db)) -> TrackActionResponse:
+    try:
+        track = TrackMetadataService(db).swap_artist_title(track_id)
+    except TrackMetadataError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return TrackActionResponse(
+        status="ok",
+        track=TrackService(db)._to_response(track),
+        message="Artist and title swapped",
     )
 
 

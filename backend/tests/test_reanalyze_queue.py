@@ -29,7 +29,9 @@ def _folders(db_session: Session, tmp_path: Path) -> None:
     db_session.commit()
 
 
-def test_enqueue_reanalyze_all_clears_lufs_and_enqueues(db_session: Session, tmp_path: Path) -> None:
+def test_enqueue_reanalyze_all_clears_lufs_and_enqueues(
+    db_session: Session, tmp_path: Path
+) -> None:
     processing = tmp_path / "processing" / "song.mp3"
     processing.parent.mkdir(parents=True)
     processing.write_bytes(b"audio")

@@ -50,4 +50,3 @@ def _extract_key(audio: object, es: object) -> tuple[str | None, str | None, flo
     if not key or key == "unknown":
         return None, None, None
     return str(key), str(scale), round(float(strength), 3)
-

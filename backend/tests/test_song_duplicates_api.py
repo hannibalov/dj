@@ -23,7 +23,9 @@ def _folder_settings(db_session: Session, tmp_path: Path) -> None:
     db_session.commit()
 
 
-def test_list_song_duplicates_endpoint(client: TestClient, db_session: Session, tmp_path: Path) -> None:
+def test_list_song_duplicates_endpoint(
+    client: TestClient, db_session: Session, tmp_path: Path
+) -> None:
     tagged_at = datetime.now(UTC)
     t1 = Track(
         source_path=str(tmp_path / "a.mp3"),
@@ -92,8 +94,12 @@ def test_resolve_song_duplicate_endpoint(
     db_session.add_all([quiet, loud])
     db_session.commit()
 
-    db_session.add(Fingerprint(track_id=quiet.id, fingerprint_hash="hash-quiet", duplicate_group_id=None))
-    db_session.add(Fingerprint(track_id=loud.id, fingerprint_hash="hash-loud", duplicate_group_id=None))
+    db_session.add(
+        Fingerprint(track_id=quiet.id, fingerprint_hash="hash-quiet", duplicate_group_id=None)
+    )
+    db_session.add(
+        Fingerprint(track_id=loud.id, fingerprint_hash="hash-loud", duplicate_group_id=None)
+    )
     db_session.commit()
 
     list_response = client.get("/duplicates/songs")

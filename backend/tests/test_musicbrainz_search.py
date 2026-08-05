@@ -2,7 +2,10 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 
-from app.metadata.musicbrainz_lookup import RecordingSearchMatch, search_recording_id, search_recording_match
+from app.metadata.musicbrainz_lookup import (
+    search_recording_id,
+    search_recording_match,
+)
 
 
 def test_search_recording_id_returns_first_match() -> None:

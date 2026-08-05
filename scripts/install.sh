@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 echo "==> DJ Library Pipeline — development install"
@@ -15,7 +15,7 @@ if [[ ! -f .env ]]; then
   echo "Created .env from .env.example"
 fi
 
-python3 install.py
+python3 scripts/install.py
 
 echo "==> Done. Run backend: cd backend && source .venv/bin/activate && uvicorn app.main:app --reload"
 echo "==> Run frontend: cd frontend && npm run dev"

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from app.metadata.genre import format_genre_tag, genre_from_file_tags, parse_embedded_genre
+from app.metadata.genre import format_genre_tag, genre_from_file_tags
 from app.metadata.musicbrainz_lookup import (
     RecordingGenreInfo,
     lookup_recording_genres,
@@ -34,7 +34,12 @@ def resolve_track_genres(
         subgenre = mb.subgenre
         if subgenre is None and embedded[1]:
             subgenre = embedded[1]
-        elif subgenre is None and embedded[0] and genre and embedded[0].casefold() != genre.casefold():
+        elif (
+            subgenre is None
+            and embedded[0]
+            and genre
+            and embedded[0].casefold() != genre.casefold()
+        ):
             subgenre = embedded[0]
         return RecordingGenreInfo(
             genre=genre,
@@ -59,6 +64,9 @@ def apply_resolved_genres_to_file(
     album: str | None,
 ) -> None:
     """Write genre (and preserve artist/title/album) to the audio file."""
+    if not artist or not title:
+        return
+
     from app.metadata.tags import write_tags
 
     write_tags(

@@ -108,9 +108,7 @@ class RoutingService:
 
         groups = SongDuplicateService(self._db).list_groups()
         if groups:
-            notify_pipeline_changed(
-                f"Same-song review: {len(groups)} group(s) need comparison"
-            )
+            notify_pipeline_changed(f"Same-song review: {len(groups)} group(s) need comparison")
 
     def _get_track(self, source_path: str) -> Track | None:
         return self._db.execute(

@@ -3,6 +3,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from sqlalchemy.orm import Session
 
 from app.models.enums import TrackStatus
 from app.models.track import Track
@@ -18,7 +19,7 @@ def _minimal_wav(path: Path) -> None:
 
 
 def test_track_response_includes_format_from_processing_file(
-    db_session,
+    db_session: Session,
     tmp_path: Path,
 ) -> None:
     wav = tmp_path / "artist - title.wav"
@@ -41,7 +42,7 @@ def test_track_response_includes_format_from_processing_file(
     assert response.bitrate_kbps is None
 
 
-def test_track_response_mp3_bitrate(db_session, tmp_path: Path) -> None:
+def test_track_response_mp3_bitrate(db_session: Session, tmp_path: Path) -> None:
     mp3 = tmp_path / "song.mp3"
     mp3.write_bytes(b"fake")
     track = Track(
@@ -78,9 +79,7 @@ def test_get_format_info_reads_real_mp3_bitrates(tmp_path: Path) -> None:
     assert info.bitrate_kbps == 128
 
     samples_320 = [
-        p
-        for p in repo_root.rglob("*.mp3")
-        if "Jan Blomqvist" in p.name and p.stat().st_size > 5000
+        p for p in repo_root.rglob("*.mp3") if "Jan Blomqvist" in p.name and p.stat().st_size > 5000
     ]
     if samples_320:
         info_320 = get_format_info(samples_320[0])

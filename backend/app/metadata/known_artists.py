@@ -34,7 +34,7 @@ def load_known_artists(db: Session) -> frozenset[str]:
 
 
 def match_known_artist(name: str, known_artists: Collection[str]) -> str | None:
-    """Return the canonical catalog artist when name matches exactly, aligns, or is a close misspelling."""
+    """Return the canonical catalog artist for an exact, aligned, or close-misspelling match."""
     cleaned = name.strip()
     if not cleaned or not known_artists:
         return None

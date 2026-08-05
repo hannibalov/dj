@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 from mutagen.wave import WAVE
+from sqlalchemy.orm import Session
 
 from app.metadata.musicbrainz_lookup import RecordingGenreInfo
 from app.models.enums import TrackStatus
@@ -19,14 +20,14 @@ def _minimal_wav(path: Path) -> None:
     path.write_bytes(data)
 
 
-def _settings(db_session, tmp_path: Path) -> None:
+def _settings(db_session: Session, tmp_path: Path) -> None:
     from app.models.setting import Setting
 
     db_session.add(Setting(key="naming_template", value="{title} - {artist} ({mix}){ext}"))
     db_session.commit()
 
 
-def test_update_metadata_writes_tags_and_db(db_session, tmp_path: Path) -> None:
+def test_update_metadata_writes_tags_and_db(db_session: Session, tmp_path: Path) -> None:
     wav = tmp_path / "processing" / "wrong - name.wav"
     wav.parent.mkdir(parents=True)
     _minimal_wav(wav)
@@ -53,13 +54,15 @@ def test_update_metadata_writes_tags_and_db(db_session, tmp_path: Path) -> None:
     assert updated.tag_confidence == 1.0
     assert updated.tagged_at is not None
 
+    assert updated.processing_path is not None
     tagged = WAVE(updated.processing_path)
+    assert tagged.tags is not None
     assert str(tagged.tags["TPE1"]) == "deadmau5"
     assert str(tagged.tags["TIT2"]) == "Strobe"
     assert "Strobe - deadmau5" in Path(updated.processing_path).name
 
 
-def test_update_metadata_resolves_genres_after_edit(db_session, tmp_path: Path) -> None:
+def test_update_metadata_resolves_genres_after_edit(db_session: Session, tmp_path: Path) -> None:
     wav = tmp_path / "processing" / "wrong - name.wav"
     wav.parent.mkdir(parents=True)
     _minimal_wav(wav)
@@ -93,7 +96,9 @@ def test_update_metadata_resolves_genres_after_edit(db_session, tmp_path: Path) 
     mock_apply.assert_called_once()
 
 
-def test_update_metadata_writes_manual_genre_and_subgenre(db_session, tmp_path: Path) -> None:
+def test_update_metadata_writes_manual_genre_and_subgenre(
+    db_session: Session, tmp_path: Path
+) -> None:
     wav = tmp_path / "processing" / "wrong - name.wav"
     wav.parent.mkdir(parents=True)
     _minimal_wav(wav)
@@ -127,7 +132,7 @@ def test_update_metadata_writes_manual_genre_and_subgenre(db_session, tmp_path: 
     mock_apply.assert_called_once()
 
 
-def test_update_metadata_requires_audio_file(db_session) -> None:
+def test_update_metadata_requires_audio_file(db_session: Session) -> None:
     track = Track(source_path="/missing/file.wav", status=TrackStatus.INGESTED)
     db_session.add(track)
     db_session.commit()
@@ -141,7 +146,7 @@ def test_update_metadata_requires_audio_file(db_session) -> None:
 
 
 def test_update_metadata_routes_to_duplicates_on_name_collision(
-    db_session, tmp_path: Path
+    db_session: Session, tmp_path: Path
 ) -> None:
     from app.models.duplicate_group import DuplicateGroup
     from app.models.fingerprint import Fingerprint
@@ -155,7 +160,9 @@ def test_update_metadata_routes_to_duplicates_on_name_collision(
         ("duplicates_folder", dup_dir),
         ("naming_template", "{title} - {artist} ({mix}){ext}"),
     ):
-        db_session.add(Setting(key=key, value=str(path) if path != "{title} - {artist} ({mix}){ext}" else path))
+        db_session.add(
+            Setting(key=key, value=str(path) if path != "{title} - {artist} ({mix}){ext}" else path)
+        )
     db_session.commit()
 
     hash_value = "metacollision1"
@@ -210,3 +217,132 @@ def test_update_metadata_routes_to_duplicates_on_name_collision(
     assert library_name in updated.final_path
     assert Path(updated.final_path).is_file()
     assert keeper_file.is_file()
+
+
+def test_swap_artist_title_swaps_fields(db_session: Session, tmp_path: Path) -> None:
+    wav = tmp_path / "processing" / "wrong - name.wav"
+    wav.parent.mkdir(parents=True)
+    _minimal_wav(wav)
+    track = Track(
+        source_path=str(tmp_path / "watch" / wav.name),
+        processing_path=str(wav),
+        status=TrackStatus.REVIEW,
+        artist="Wonderwall",
+        title="Oasis",
+    )
+    db_session.add(track)
+    db_session.commit()
+    _settings(db_session, tmp_path)
+
+    with patch("app.services.track_metadata_service.notify_pipeline_changed"):
+        updated = TrackMetadataService(db_session).swap_artist_title(track.id)
+
+    assert updated.artist == "Oasis"
+    assert updated.title == "Wonderwall"
+    if hasattr(updated, "metadata_issue"):
+        assert updated.metadata_issue is None
+
+
+def test_swap_artist_title_missing_track(db_session: Session) -> None:
+    with pytest.raises(TrackMetadataError, match="Track not found"):
+        TrackMetadataService(db_session).swap_artist_title(999999)
+
+
+def test_swap_artist_title_requires_title(db_session: Session, tmp_path: Path) -> None:
+    track = Track(
+        source_path=str(tmp_path / "watch" / "missing.wav"),
+        status=TrackStatus.INGESTED,
+        artist="Wonderwall",
+        title=None,
+    )
+    db_session.add(track)
+    db_session.commit()
+
+    with pytest.raises(TrackMetadataError, match="missing artist or title"):
+        TrackMetadataService(db_session).swap_artist_title(track.id)
+
+
+def _track_with_file(tmp_path: Path, name: str, *, artist: str, title: str) -> Track:
+    wav = tmp_path / "processing" / name
+    wav.parent.mkdir(parents=True, exist_ok=True)
+    _minimal_wav(wav)
+    return Track(
+        source_path=str(tmp_path / "watch" / name),
+        processing_path=str(wav),
+        status=TrackStatus.REVIEW,
+        artist=artist,
+        title=title,
+    )
+
+
+def test_rename_artist_everywhere_updates_matching_tracks_only(
+    db_session: Session, tmp_path: Path
+) -> None:
+    track_a = _track_with_file(tmp_path, "a.wav", artist="Daft Punk", title="One More Time")
+    track_b = _track_with_file(tmp_path, "b.wav", artist="daft punk", title="Around the World")
+    track_c = _track_with_file(tmp_path, "c.wav", artist="Justice", title="D.A.N.C.E.")
+    db_session.add_all([track_a, track_b, track_c])
+    db_session.commit()
+    _settings(db_session, tmp_path)
+
+    with (
+        patch("app.services.track_metadata_service.notify_pipeline_changed"),
+        patch(
+            "app.services.track_metadata_service.resolve_track_genres",
+            return_value=RecordingGenreInfo(None, None, None),
+        ),
+    ):
+        result = TrackMetadataService(db_session).rename_artist_everywhere(
+            "Daft Punk", "Daft Punk Corrected"
+        )
+
+    assert result.status == "ok"
+    assert result.matched == 2
+    assert result.updated == 2
+
+    db_session.refresh(track_a)
+    db_session.refresh(track_b)
+    db_session.refresh(track_c)
+    assert track_a.artist == "Daft Punk Corrected"
+    assert track_b.artist == "Daft Punk Corrected"
+    assert track_c.artist == "Justice"
+
+
+def test_rename_artist_everywhere_requires_names(db_session: Session) -> None:
+    with pytest.raises(TrackMetadataError, match="required"):
+        TrackMetadataService(db_session).rename_artist_everywhere("", "New Name")
+
+
+def test_rename_artist_everywhere_continues_after_per_track_failure(
+    db_session: Session, tmp_path: Path
+) -> None:
+    good_track = _track_with_file(tmp_path, "good.wav", artist="Misspeled", title="Track One")
+    bad_track = Track(
+        source_path=str(tmp_path / "watch" / "missing.wav"),
+        processing_path=str(tmp_path / "processing" / "missing.wav"),
+        status=TrackStatus.REVIEW,
+        artist="Misspeled",
+        title="Track Two",
+    )
+    db_session.add_all([good_track, bad_track])
+    db_session.commit()
+    _settings(db_session, tmp_path)
+
+    with (
+        patch("app.services.track_metadata_service.notify_pipeline_changed"),
+        patch(
+            "app.services.track_metadata_service.resolve_track_genres",
+            return_value=RecordingGenreInfo(None, None, None),
+        ),
+    ):
+        result = TrackMetadataService(db_session).rename_artist_everywhere(
+            "Misspeled", "Fixed Name"
+        )
+
+    assert result.matched == 2
+    assert result.updated == 1
+
+    db_session.refresh(good_track)
+    db_session.refresh(bad_track)
+    assert good_track.artist == "Fixed Name"
+    assert bad_track.artist == "Misspeled"

@@ -1,6 +1,5 @@
 """Derive a display pipeline step from track status and progress fields."""
 
-
 from app.models.enums import TrackStatus
 from app.models.track import Track
 

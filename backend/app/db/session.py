@@ -1,5 +1,6 @@
 from collections.abc import Generator
 from pathlib import Path
+from typing import Any
 from urllib.parse import unquote, urlparse
 
 from sqlalchemy import Engine, create_engine, event
@@ -32,7 +33,7 @@ def init_engine(database_url: str) -> None:
     if is_sqlite:
 
         @event.listens_for(_engine, "connect")
-        def _sqlite_pragmas(dbapi_conn, connection_record) -> None:
+        def _sqlite_pragmas(dbapi_conn: Any, connection_record: object) -> None:
             cursor = dbapi_conn.cursor()
             cursor.execute("PRAGMA journal_mode=WAL")
             cursor.execute("PRAGMA busy_timeout=30000")

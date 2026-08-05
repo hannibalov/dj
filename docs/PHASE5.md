@@ -164,7 +164,7 @@ Implement manual resolution with a clear contract:
 | Waveform preview | Stretch goal — e.g. `GET /tracks/:id/waveform` (ffmpeg peaks PNG or JSON); embed in compare panel |
 | Audio A/B | Out of scope for v1 (no in-browser player required by spec) |
 
-Spec reference: [dj-library-pipeline-spec.md](../dj-library-pipeline-spec.md) — Duplicate Resolution UI (compare, waveform previews, manual keep/remove).
+Spec reference: [dj-library-pipeline-spec.md](./dj-library-pipeline-spec.md) — Duplicate Resolution UI (compare, waveform previews, manual keep/remove).
 
 ---
 
@@ -283,7 +283,7 @@ Restart **API**, **worker**, and **frontend** after code changes.
 
 ## References
 
-- Product spec: [dj-library-pipeline-spec.md](../dj-library-pipeline-spec.md) — Duplicate Resolution UI, `POST /duplicates/resolve`
+- Product spec: [dj-library-pipeline-spec.md](./dj-library-pipeline-spec.md) — Duplicate Resolution UI, `POST /duplicates/resolve`
 - Roadmap: [ROADMAP.md](./ROADMAP.md)
 - Phase 3: [PHASE3.md](./PHASE3.md)
 - Phase 4: [PHASE4.md](./PHASE4.md)

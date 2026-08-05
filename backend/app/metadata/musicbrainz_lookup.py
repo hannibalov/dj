@@ -1,6 +1,7 @@
 """MusicBrainz recording genres and community tags."""
 
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 import httpx
@@ -275,7 +276,7 @@ def lookup_recording_genres(recording_id: str) -> RecordingGenreInfo:
     )
 
 
-def _parse_entity_genres(data: dict[str, object]) -> RecordingGenreInfo:
+def _parse_entity_genres(data: Mapping[str, object]) -> RecordingGenreInfo:
     genres = _sorted_names(data.get("genres"))
     tags = _sorted_names(data.get("tags"))
 
@@ -287,7 +288,7 @@ def _parse_entity_genres(data: dict[str, object]) -> RecordingGenreInfo:
     return RecordingGenreInfo(genre=genre, subgenre=subgenre)
 
 
-def _release_ids_from_recording(data: dict[str, object], *, limit: int) -> list[str]:
+def _release_ids_from_recording(data: Mapping[str, object], *, limit: int) -> list[str]:
     releases = data.get("releases")
     if not isinstance(releases, list):
         return []
@@ -304,7 +305,7 @@ def _release_ids_from_recording(data: dict[str, object], *, limit: int) -> list[
     return ids
 
 
-def _artist_ids_from_recording(data: dict[str, object], *, limit: int) -> list[str]:
+def _artist_ids_from_recording(data: Mapping[str, object], *, limit: int) -> list[str]:
     credits = data.get("artist-credit")
     if not isinstance(credits, list):
         return []
@@ -332,7 +333,7 @@ def _throttle_musicbrainz() -> None:
     _mb_last_request_at = time.monotonic()
 
 
-def _mb_get(url: str, params: dict[str, object]) -> dict[str, object] | None:
+def _mb_get(url: str, params: Mapping[str, str | int]) -> Mapping[str, object] | None:
     _throttle_musicbrainz()
     try:
         with httpx.Client(timeout=REQUEST_TIMEOUT) as client:

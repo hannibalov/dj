@@ -31,6 +31,7 @@ class TrackResponse(BaseModel):
     key_confidence: float | None
     integrated_lufs: float | None
     true_peak_db: float | None
+    metadata_issue: str | None = None
     format_extension: str | None = None
     audio_family: str | None = None
     bitrate_kbps: int | None = None

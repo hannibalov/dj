@@ -43,3 +43,24 @@ export function updateTrackMetadata(
 ): Promise<TrackActionResponse> {
   return api.patch<TrackActionResponse>(`/tracks/${trackId}/metadata`, body)
 }
+
+export function swapArtistTitle(trackId: number): Promise<TrackActionResponse> {
+  return api.post<TrackActionResponse>(`/tracks/${trackId}/swap-artist-title`)
+}
+
+export interface RenameArtistRequest {
+  old_artist: string
+  new_artist: string
+}
+
+export interface RenameArtistResponse {
+  status: string
+  matched: number
+  updated: number
+}
+
+export function renameArtistEverywhere(
+  body: RenameArtistRequest,
+): Promise<RenameArtistResponse> {
+  return api.post<RenameArtistResponse>('/tracks/rename-artist', body)
+}

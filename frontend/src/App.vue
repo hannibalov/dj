@@ -40,6 +40,7 @@ import AppSnackbar from '@/components/AppSnackbar.vue'
 
 const navItems = [
   { title: 'Dashboard', icon: 'mdi-view-dashboard', to: '/' },
+  { title: 'Library', icon: 'mdi-music-box-multiple', to: '/library' },
   { title: 'Settings', icon: 'mdi-cog', to: '/settings' },
 ]
 </script>

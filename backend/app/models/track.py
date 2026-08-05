@@ -34,6 +34,7 @@ class Track(Base):
     key_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     integrated_lufs: Mapped[float | None] = mapped_column(Float, nullable=True)
     true_peak_db: Mapped[float | None] = mapped_column(Float, nullable=True)
+    metadata_issue: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

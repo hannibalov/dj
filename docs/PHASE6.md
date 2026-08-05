@@ -132,7 +132,7 @@ Tune on Pi 4 if OOM — worker is the heaviest (ffmpeg analyze).
 - [x] nginx proxies `/ws` for live dashboard in Docker
 - [x] Production backend image (no dev pip extras)
 - [x] README documents local build, Pi deploy, registry push/pull
-- [x] `env.docker.example` + `docker-compose.pull.yml` committed
+- [x] `env.docker.example` committed
 - [x] Docs: PHASE6 + ROADMAP updated
 - [ ] Verified end-to-end on physical Raspberry Pi (operator checklist)
 
@@ -152,7 +152,7 @@ docker compose pull && docker compose up -d
 
 Only `deploy/docker-compose.yml`, `.env`, and `data/` live on the Pi.
 
-**Why two compose files?** Root `docker-compose.yml` is for developers who clone the repo and **build** locally. `deploy/docker-compose.yml` is for the Pi: it **pulls** `DOCKER_USER/dj-pipeline-*` images and needs no source tree. The legacy `docker-compose.pull.yml` (full `DJ_*_IMAGE` URLs) is deprecated.
+**Why two compose files?** Root `docker-compose.yml` is for developers who clone the repo and **build** locally. `deploy/docker-compose.yml` is for the Pi: it **pulls** `DOCKER_USER/dj-pipeline-*` images and needs no source tree. (The legacy `docker-compose.pull.yml`, an older pull-only file with full `DJ_*_IMAGE` URLs, has been removed.)
 
 ### Publish images
 
@@ -174,5 +174,5 @@ docker compose pull && docker compose up -d
 ## References
 
 - [README.md](../README.md) — Docker quick start
-- [dj-library-pipeline-spec.md](../dj-library-pipeline-spec.md) — Docker-first architecture
+- [dj-library-pipeline-spec.md](./dj-library-pipeline-spec.md) — Docker-first architecture
 - [ROADMAP.md](./ROADMAP.md)

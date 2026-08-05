@@ -98,9 +98,7 @@ class GenreBackfillService:
 
         if enriched:
             self._db.commit()
-            notify_pipeline_changed(
-                f"Genre backfill: enriched {enriched}, skipped {skipped}"
-            )
+            notify_pipeline_changed(f"Genre backfill: enriched {enriched}, skipped {skipped}")
         else:
             self._db.commit()
 

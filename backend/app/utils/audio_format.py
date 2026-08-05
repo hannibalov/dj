@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from mutagen import File as MutagenFile  # type: ignore[attr-defined]
+from mutagen import File as MutagenFile
 
 LOSSLESS_EXTENSIONS = frozenset({".flac", ".wav", ".aiff", ".aif"})
 MP3_EXTENSION = ".mp3"

@@ -1,5 +1,6 @@
 """Reconcile SQLite track rows with audio files across all configured folders."""
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -11,6 +12,7 @@ from app.metadata.normalize import names_align
 from app.metadata.tags import parse_filename_metadata
 from app.models.enums import TrackStatus
 from app.models.track import Track
+from app.schemas.settings import SettingsResponse
 from app.services.queue_service import QueueService
 from app.services.settings_service import SettingsService
 from app.utils.audio_extensions import is_audio_file
@@ -87,11 +89,16 @@ class LibrarySyncService:
         )
 
     @staticmethod
-    def _library_roots(settings) -> list[tuple[Path, frozenset[TrackStatus] | None]]:
+    def _library_roots(
+        settings: SettingsResponse,
+    ) -> list[tuple[Path, frozenset[TrackStatus] | None]]:
         return [
             (Path(settings.watch_folder), None),
             (Path(settings.incoming_folder), None),
-            (Path(settings.processing_folder), frozenset({TrackStatus.INGESTED, TrackStatus.PROCESSING})),
+            (
+                Path(settings.processing_folder),
+                frozenset({TrackStatus.INGESTED, TrackStatus.PROCESSING}),
+            ),
             (Path(settings.ready_folder), frozenset({TrackStatus.READY})),
             (Path(settings.review_folder), frozenset({TrackStatus.REVIEW})),
             (Path(settings.duplicates_folder), frozenset({TrackStatus.DUPLICATE})),
@@ -100,7 +107,9 @@ class LibrarySyncService:
         ]
 
     @staticmethod
-    def _scan_audio_files(folder_roots: list[tuple[Path, frozenset[TrackStatus] | None]]) -> list[Path]:
+    def _scan_audio_files(
+        folder_roots: list[tuple[Path, frozenset[TrackStatus] | None]],
+    ) -> list[Path]:
         files: list[Path] = []
         seen: set[Path] = set()
         for root, _ in folder_roots:
@@ -124,7 +133,7 @@ class LibrarySyncService:
         return by_name
 
     @staticmethod
-    def _linked_paths(tracks: list[Track]) -> set[Path]:
+    def _linked_paths(tracks: Sequence[Track]) -> set[Path]:
         linked: set[Path] = set()
         for track in tracks:
             for path_str in (track.source_path, track.processing_path, track.final_path):

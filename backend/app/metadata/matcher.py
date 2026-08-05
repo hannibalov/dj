@@ -81,10 +81,7 @@ def match_track_metadata(
             elif (
                 parsed.artist
                 and parsed.title
-                and (
-                    embedded.artist != embedded_raw.artist
-                    or embedded.title != embedded_raw.title
-                )
+                and (embedded.artist != embedded_raw.artist or embedded.title != embedded_raw.title)
             ):
                 confidence = 0.72
             candidates.append(
@@ -107,7 +104,8 @@ def match_track_metadata(
                 embedded_raw.title,
                 filename=parsed,
             )
-            if embedded_raw.artist and embedded_raw.title and embedded_tags_swapped(embedded, parsed):
+            tags_swapped = embedded_raw.artist and embedded_raw.title
+            if tags_swapped and embedded_tags_swapped(embedded, parsed):
                 filename_confidence = 0.68
             elif not embedded_raw.artist and not embedded_raw.title:
                 filename_confidence = 0.58
@@ -134,11 +132,7 @@ def match_track_metadata(
 
 def _normalize_match(match: MetadataMatch) -> MetadataMatch:
     artist, title, mix = normalize_track_credits(match.artist, match.title, match.mix_version)
-    if (
-        artist == match.artist
-        and title == match.title
-        and mix == match.mix_version
-    ):
+    if artist == match.artist and title == match.title and mix == match.mix_version:
         return match
     return MetadataMatch(
         artist=artist,

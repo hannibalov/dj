@@ -68,7 +68,9 @@ def test_list_groups_excludes_resolved_groups(db_session: Session, tmp_path: Pat
     assert DuplicateService(db_session).list_groups() == []
 
 
-def test_list_groups_excludes_archived_members_from_count(db_session: Session, tmp_path: Path) -> None:
+def test_list_groups_excludes_archived_members_from_count(
+    db_session: Session, tmp_path: Path
+) -> None:
     db_session.add(Setting(key="duplicates_folder", value=str(tmp_path / "duplicates")))
     active = Track(source_path=str(tmp_path / "a.mp3"), status=TrackStatus.DUPLICATE)
     archived = Track(source_path=str(tmp_path / "b.mp3"), status=TrackStatus.ARCHIVED)

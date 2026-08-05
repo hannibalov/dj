@@ -12,8 +12,8 @@ from app.models.fingerprint import Fingerprint
 from app.models.job import Job
 from app.models.track import Track
 from app.services.queue_service import QueueService
-from app.utils.job_payload import job_payload
 from app.services.settings_service import SettingsService
+from app.utils.job_payload import job_payload
 from app.utils.workspace_files import (
     clear_stale_processing_copy,
     move_into_destination,

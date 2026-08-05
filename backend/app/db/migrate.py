@@ -72,8 +72,19 @@ def migrate_phase5_columns(engine: Engine) -> None:
     )
 
 
+def migrate_metadata_issue_column(engine: Engine) -> None:
+    _add_columns(
+        engine,
+        "tracks",
+        {
+            "metadata_issue": "VARCHAR(32)",
+        },
+    )
+
+
 def run_migrations(engine: Engine) -> None:
     migrate_tracks_analysis_columns(engine)
     migrate_phase4_columns(engine)
     migrate_phase5_columns(engine)
     migrate_genre_columns(engine)
+    migrate_metadata_issue_column(engine)

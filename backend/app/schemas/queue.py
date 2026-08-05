@@ -58,3 +58,12 @@ class ClearFailedJobsResponse(BaseModel):
     status: str
     deleted_count: int
     message: str
+
+
+class MetadataSanityResponse(BaseModel):
+    status: str
+    scanned: int
+    flagged_possible_swap: int
+    flagged_artist_in_title: int
+    artist_in_title_ratio: float
+    anomaly: bool

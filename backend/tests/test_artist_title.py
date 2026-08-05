@@ -10,7 +10,7 @@ from app.metadata.types import FileTags
 
 
 def test_resolve_ambiguous_single_word_pair_defaults_artist_first() -> None:
-    """Without tags, prefer Artist - Title; MusicBrainz disambiguation fixes Title - Artist files."""
+    """Without tags, prefer Artist - Title; MusicBrainz disambiguation fixes Title - Artist."""
     artist, title = resolve_artist_title("CamelPhat", "Cola")
     assert artist == "CamelPhat"
     assert title == "Cola"

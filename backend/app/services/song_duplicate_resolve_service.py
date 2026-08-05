@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 
 from app.logging import get_logger
 from app.models.enums import TrackStatus
-from app.models.track import Track
 from app.schemas.song_duplicate import SongDuplicateResolveRequest, SongDuplicateResolveResponse
 from app.services.notify import notify_pipeline_changed
 from app.services.queue_service import QueueService
@@ -23,6 +22,7 @@ from app.utils.workspace_files import (
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
+    from app.models.track import Track
     from app.schemas.settings import SettingsResponse
 
 logger = get_logger("DUPLICATES")

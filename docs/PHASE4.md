@@ -249,6 +249,6 @@ Restart **API**, **worker**, **watcher**, and **frontend** after code changes.
 
 ## References
 
-- [dj-library-pipeline-spec.md](../dj-library-pipeline-spec.md)
+- [dj-library-pipeline-spec.md](./dj-library-pipeline-spec.md)
 - [PHASE3.md](./PHASE3.md)
 - [ROADMAP.md](./ROADMAP.md)

@@ -8,11 +8,13 @@ from app.schemas.queue import (
     ClearFailedJobsResponse,
     GenreBackfillResponse,
     LibrarySyncResponse,
+    MetadataSanityResponse,
     QueueResponse,
     RescanResponse,
 )
 from app.services.genre_backfill_service import GenreBackfillService
 from app.services.library_sync_service import LibrarySyncService
+from app.services.metadata_sanity_service import MetadataSanityService
 from app.services.queue_service import QueueService
 
 router = APIRouter()
@@ -60,11 +62,7 @@ async def unstick_queue(db: Session = Depends(get_db)) -> RescanResponse:
 @router.post("/clear-failed-jobs", response_model=ClearFailedJobsResponse)
 async def clear_failed_jobs(db: Session = Depends(get_db)) -> ClearFailedJobsResponse:
     count = QueueService(db).clear_failed_jobs()
-    message = (
-        f"Removed {count} failed job(s) from history"
-        if count
-        else "No failed jobs to clear"
-    )
+    message = f"Removed {count} failed job(s) from history" if count else "No failed jobs to clear"
     await broadcast_snapshot(message)
     return ClearFailedJobsResponse(status="ok", deleted_count=count, message=message)
 
@@ -72,9 +70,7 @@ async def clear_failed_jobs(db: Session = Depends(get_db)) -> ClearFailedJobsRes
 @router.post("/reanalyze-all", response_model=AnalyzeBacklogResponse)
 async def reanalyze_all(db: Session = Depends(get_db)) -> AnalyzeBacklogResponse:
     result = QueueService(db).enqueue_reanalyze_all()
-    await broadcast_snapshot(
-        f"Reanalyze all: {result.enqueued} enqueued, {result.skipped} skipped"
-    )
+    await broadcast_snapshot(f"Reanalyze all: {result.enqueued} enqueued, {result.skipped} skipped")
     return AnalyzeBacklogResponse(
         status=result.status,
         enqueued=result.enqueued,
@@ -112,4 +108,25 @@ async def library_sync(db: Session = Depends(get_db)) -> LibrarySyncResponse:
         metadata_updated=result.metadata_updated,
         missing_files=result.missing_files,
         orphan_files=result.orphan_files,
+    )
+
+
+@router.post("/metadata-sanity-check", response_model=MetadataSanityResponse)
+async def metadata_sanity_check(db: Session = Depends(get_db)) -> MetadataSanityResponse:
+    result = MetadataSanityService(db).run_check()
+    message = (
+        f"Metadata sanity check: scanned {result.scanned}, "
+        f"{result.flagged_possible_swap} possible swap, "
+        f"{result.flagged_artist_in_title} artist-in-title"
+    )
+    if result.anomaly:
+        message += " — anomaly ratio exceeded"
+    await broadcast_snapshot(message)
+    return MetadataSanityResponse(
+        status=result.status,
+        scanned=result.scanned,
+        flagged_possible_swap=result.flagged_possible_swap,
+        flagged_artist_in_title=result.flagged_artist_in_title,
+        artist_in_title_ratio=result.artist_in_title_ratio,
+        anomaly=result.anomaly,
     )

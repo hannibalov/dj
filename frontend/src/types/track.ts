@@ -22,6 +22,7 @@ export interface Track {
   album: string | null
   genre: string | null
   subgenre: string | null
+  metadata_issue: string | null
   mix_version: string | null
   tag_confidence: number | null
   needs_metadata_review: boolean

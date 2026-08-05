@@ -44,3 +44,16 @@ export interface ClearFailedJobsResult {
 export function clearFailedJobs(): Promise<ClearFailedJobsResult> {
   return api.post<ClearFailedJobsResult>('/queue/clear-failed-jobs')
 }
+
+export interface MetadataSanityResponse {
+  status: string
+  scanned: number
+  flagged_possible_swap: number
+  flagged_artist_in_title: number
+  artist_in_title_ratio: number
+  anomaly: boolean
+}
+
+export function metadataSanityCheck(): Promise<MetadataSanityResponse> {
+  return api.post<MetadataSanityResponse>('/queue/metadata-sanity-check')
+}

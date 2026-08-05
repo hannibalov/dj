@@ -15,6 +15,7 @@ const baseTrack = {
   album: null,
   genre: null,
   subgenre: null,
+  metadata_issue: null,
   mix_version: null,
   format_extension: null,
   audio_family: null,

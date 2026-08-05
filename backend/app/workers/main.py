@@ -103,9 +103,7 @@ def run_once() -> bool:
                 if job.status == JobStatus.COMPLETED:
                     notify_pipeline_changed(f"Tagged: {_job_label(job)}")
                 elif job.status == JobStatus.FAILED:
-                    notify_pipeline_changed(
-                        f"Tag failed: {_job_label(job)} — {job.error_message}"
-                    )
+                    notify_pipeline_changed(f"Tag failed: {_job_label(job)} — {job.error_message}")
             elif job.job_type == JobType.ROUTE:
                 RoutingService(db).process_route_job(job)
                 db.refresh(job)
@@ -132,9 +130,7 @@ def run_once() -> bool:
             if pending == 0:
                 notify_pipeline_changed("Worker idle")
             else:
-                notify_pipeline_changed(
-                    f"Worker between jobs ({pending} still pending in queue)"
-                )
+                notify_pipeline_changed(f"Worker between jobs ({pending} still pending in queue)")
         return True
     finally:
         db.close()

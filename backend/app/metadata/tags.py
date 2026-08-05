@@ -1,19 +1,19 @@
 """Read and write audio tags via mutagen."""
 
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 from pathlib import Path
-from typing import Callable
+from typing import Any
 
-from mutagen import File as MutagenFile  # type: ignore[attr-defined]
+from mutagen import File as MutagenFile
 from mutagen.aiff import AIFF
 from mutagen.easyid3 import EasyID3
 from mutagen.flac import FLAC
-from mutagen.id3 import ID3NoHeaderError, TALB, TCON, TIT2, TPE1
+from mutagen.id3 import TALB, TCON, TIT2, TPE1, ID3NoHeaderError
 from mutagen.mp3 import MP3
 from mutagen.wave import WAVE
 
-from app.metadata.rename import normalize_track_credits, strip_trailing_mix_labels
 from app.metadata.artist_title import resolve_artist_title
+from app.metadata.rename import normalize_track_credits, strip_trailing_mix_labels
 from app.metadata.types import FileTags
 
 _ID3_CHUNK_SUFFIXES = frozenset({".wav", ".aiff", ".aif"})
@@ -88,12 +88,14 @@ def parse_filename_metadata(
     return FileTags(artist=artist, title=title, album=embedded.album, genre=embedded.genre)
 
 
-def _write_mp3(path: Path, *, artist: str, title: str, album: str | None, genre: str | None) -> None:
+def _write_mp3(
+    path: Path, *, artist: str, title: str, album: str | None, genre: str | None
+) -> None:
     try:
         audio = MP3(path, ID3=EasyID3)
     except Exception:
         audio = MP3(path)
-        audio.add_tags()  # type: ignore[no-untyped-call]
+        audio.add_tags()
         audio = MP3(path, ID3=EasyID3)
 
     audio["artist"] = artist
@@ -105,7 +107,9 @@ def _write_mp3(path: Path, *, artist: str, title: str, album: str | None, genre:
     audio.save()
 
 
-def _write_flac(path: Path, *, artist: str, title: str, album: str | None, genre: str | None) -> None:
+def _write_flac(
+    path: Path, *, artist: str, title: str, album: str | None, genre: str | None
+) -> None:
     audio = FLAC(path)
     audio["artist"] = artist
     audio["title"] = title
@@ -116,7 +120,9 @@ def _write_flac(path: Path, *, artist: str, title: str, album: str | None, genre
     audio.save()
 
 
-def _write_easy(path: Path, *, artist: str, title: str, album: str | None, genre: str | None) -> None:
+def _write_easy(
+    path: Path, *, artist: str, title: str, album: str | None, genre: str | None
+) -> None:
     audio = MutagenFile(path, easy=True)
     if audio is None:
         raise ValueError(f"Unsupported audio format: {path.suffix}")
@@ -131,11 +137,7 @@ def _write_easy(path: Path, *, artist: str, title: str, album: str | None, genre
 
 def _read_id3_chunk_tags(path: Path) -> FileTags:
     suffix = path.suffix.lower()
-    loader: Callable[[Path], WAVE | AIFF]
-    if suffix == ".wav":
-        loader = WAVE
-    else:
-        loader = AIFF
+    loader: Callable[[Path], WAVE | AIFF] = WAVE if suffix == ".wav" else AIFF
     try:
         audio = loader(path)
     except Exception:
@@ -174,23 +176,23 @@ def _write_id3_chunk(
 
 
 def _apply_id3_frames(
-    tags: object,
+    tags: Any,
     *,
     artist: str,
     title: str,
     album: str | None,
     genre: str | None,
 ) -> None:
-    tags.setall("TPE1", [TPE1(encoding=3, text=artist)])  # type: ignore[union-attr]
-    tags.setall("TIT2", [TIT2(encoding=3, text=title)])  # type: ignore[union-attr]
+    tags.setall("TPE1", [TPE1(encoding=3, text=artist)])
+    tags.setall("TIT2", [TIT2(encoding=3, text=title)])
     if album:
-        tags.setall("TALB", [TALB(encoding=3, text=album)])  # type: ignore[union-attr]
+        tags.setall("TALB", [TALB(encoding=3, text=album)])
     else:
-        tags.delall("TALB")  # type: ignore[union-attr]
+        tags.delall("TALB")
     if genre:
-        tags.setall("TCON", [TCON(encoding=3, text=genre)])  # type: ignore[union-attr]
+        tags.setall("TCON", [TCON(encoding=3, text=genre)])
     else:
-        tags.delall("TCON")  # type: ignore[union-attr]
+        tags.delall("TCON")
 
 
 def _id3_text(frame: object) -> str | None:

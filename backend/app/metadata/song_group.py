@@ -1,6 +1,7 @@
 """Same-song grouping keys for metadata-based duplicate review."""
 
 from collections import defaultdict
+from typing import Literal
 
 from app.models.enums import TrackStatus
 from app.models.track import Track
@@ -71,7 +72,6 @@ def cluster_song_groups(tracks: list[Track]) -> list[list[Track]]:
             union(anchor, track_id)
 
     clusters: dict[int, list[Track]] = defaultdict(list)
-    track_by_id = {track.id: track for track in eligible}
     for track in eligible:
         clusters[find(track.id)].append(track)
 
@@ -94,7 +94,7 @@ def canonical_group_key(members: list[Track]) -> str:
     return f"cluster:{min(track.id for track in members)}"
 
 
-def group_match_type(members: list[Track]) -> str:
+def group_match_type(members: list[Track]) -> Literal["musicbrainz", "metadata"]:
     mbids = {track.musicbrainz_recording_id for track in members if track.musicbrainz_recording_id}
     if len(mbids) == 1:
         return "musicbrainz"

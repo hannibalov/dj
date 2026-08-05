@@ -148,4 +148,4 @@ conda install -c mtg essentia   # example for local dev
 - [ROADMAP.md](./ROADMAP.md)
 - [PHASE3.md](./PHASE3.md)
 - [PHASE4.md](./PHASE4.md)
-- [dj-library-pipeline-spec.md](../dj-library-pipeline-spec.md)
+- [dj-library-pipeline-spec.md](./dj-library-pipeline-spec.md)

@@ -1,7 +1,7 @@
 .PHONY: install lint lint-fix test test-backend test-frontend typecheck run-api
 
 install:
-	./install.sh
+	./scripts/install.sh
 
 lint:
 	$(MAKE) lint-backend

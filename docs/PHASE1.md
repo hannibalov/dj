@@ -30,7 +30,7 @@
 
 ### Tooling
 
-- `make test`, `make lint`, `install.py` writes local `.env` under `./data/`
+- `make test`, `make lint`, `scripts/install.py` writes local `.env` under `./data/`
 - Docker Compose with `/data/...` overrides via `environment:` block
 - pytest includes queue dedup + idempotent ingest tests
 
@@ -86,7 +86,7 @@ Restart **API**, **worker**, **watcher**, and **frontend** (`npm run dev` for `/
 
 ### Configuration
 
-- **`.env`** — local dev paths under `<repo>/data/` (written by `install.py`)
+- **`.env`** — local dev paths under `<repo>/data/` (written by `scripts/install.py`)
 - **Docker** — `docker-compose.yml` `x-docker-env` sets `/data/...`
 - **UI** — overrides stored in SQLite `settings` table; restart watcher if `watch_folder` changes
 

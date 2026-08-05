@@ -3,7 +3,6 @@
 import struct
 from pathlib import Path
 
-import pytest
 from mutagen.wave import WAVE
 
 from app.metadata.tags import read_tags, write_tags
@@ -23,6 +22,7 @@ def test_write_tags_wav_uses_id3_frames(tmp_path: Path) -> None:
     write_tags(path, artist="deadmau5", title="Strobe (Original Mix)")
 
     audio = WAVE(path)
+    assert audio.tags is not None
     assert str(audio.tags["TPE1"]) == "deadmau5"
     assert str(audio.tags["TIT2"]) == "Strobe (Original Mix)"
 

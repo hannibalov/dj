@@ -97,7 +97,7 @@ make lint
 
 ### fpcalc (Chromaprint)
 
-**Not installed by `install.sh`** — install on the host before running the worker locally.
+**Not installed by `scripts/install.sh`** — install on the host before running the worker locally.
 
 ```bash
 # macOS
@@ -111,7 +111,7 @@ Verify: `fpcalc -version`
 
 Docker: `libchromaprint-tools` is in `docker/Dockerfile.backend` (includes `fpcalc`).
 
-You also need **ffmpeg** for the analyze step (`brew install ffmpeg` / `apt install ffmpeg`). Neither ffmpeg nor fpcalc is validated by `install.py` today.
+You also need **ffmpeg** for the analyze step (`brew install ffmpeg` / `apt install ffmpeg`). Neither ffmpeg nor fpcalc is validated by `scripts/install.py` today.
 
 Restart **API**, **worker**, **watcher**, and **frontend** after code changes.
 
@@ -148,6 +148,6 @@ Restart **API**, **worker**, **watcher**, and **frontend** after code changes.
 
 ## References
 
-- [dj-library-pipeline-spec.md](../dj-library-pipeline-spec.md)
+- [dj-library-pipeline-spec.md](./dj-library-pipeline-spec.md)
 - [PHASE2.md](./PHASE2.md)
 - [PHASE4.md](./PHASE4.md)

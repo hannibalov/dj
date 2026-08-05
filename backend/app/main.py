@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import duplicates, downloads, health, logs, pipeline, queue, tracks, ws
+from app.api import downloads, duplicates, health, logs, pipeline, queue, tracks, ws
 from app.api import settings as settings_routes
 from app.config import get_settings
 from app.db.session import create_tables, get_engine, init_engine

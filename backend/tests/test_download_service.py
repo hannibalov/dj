@@ -82,9 +82,13 @@ def test_worker_chains_ingest_after_download(db_session: Session, tmp_path: Path
 
     _chain_after_download(queue, download_job, output_path)
 
-    ingest_jobs = db_session.execute(
-        select(Job).where(Job.job_type == JobType.INGEST, Job.source_path == str(output))
-    ).scalars().all()
+    ingest_jobs = (
+        db_session.execute(
+            select(Job).where(Job.job_type == JobType.INGEST, Job.source_path == str(output))
+        )
+        .scalars()
+        .all()
+    )
     assert len(ingest_jobs) == 1
 
 

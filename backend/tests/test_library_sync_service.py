@@ -1,13 +1,15 @@
 from datetime import UTC, datetime
 from pathlib import Path
 
+from sqlalchemy.orm import Session
+
 from app.models.enums import TrackStatus
 from app.models.setting import Setting
 from app.models.track import Track
 from app.services.library_sync_service import LibrarySyncService
 
 
-def _set_folders(db_session, tmp_path: Path) -> None:
+def _set_folders(db_session: Session, tmp_path: Path) -> None:
     folders = {
         "watch_folder": tmp_path / "watch",
         "incoming_folder": tmp_path / "incoming",
@@ -26,7 +28,7 @@ def _set_folders(db_session, tmp_path: Path) -> None:
     db_session.commit()
 
 
-def test_library_sync_enqueues_new_watch_files(db_session, tmp_path: Path) -> None:
+def test_library_sync_enqueues_new_watch_files(db_session: Session, tmp_path: Path) -> None:
     _set_folders(db_session, tmp_path)
     watch_file = tmp_path / "watch" / "New Track - Artist.mp3"
     watch_file.write_bytes(b"x")
@@ -38,7 +40,7 @@ def test_library_sync_enqueues_new_watch_files(db_session, tmp_path: Path) -> No
     assert result.orphan_files == 0
 
 
-def test_library_sync_repairs_stale_final_path(db_session, tmp_path: Path) -> None:
+def test_library_sync_repairs_stale_final_path(db_session: Session, tmp_path: Path) -> None:
     _set_folders(db_session, tmp_path)
     basename = "Song - Artist (Original Mix).mp3"
     ready_file = tmp_path / "ready" / basename
@@ -62,7 +64,9 @@ def test_library_sync_repairs_stale_final_path(db_session, tmp_path: Path) -> No
     assert track.final_path == str(ready_file)
 
 
-def test_library_sync_updates_reversed_metadata_from_filename(db_session, tmp_path: Path) -> None:
+def test_library_sync_updates_reversed_metadata_from_filename(
+    db_session: Session, tmp_path: Path
+) -> None:
     _set_folders(db_session, tmp_path)
     ready_file = tmp_path / "ready" / "Wonderwall - Oaisis (Original Mix).mp3"
     ready_file.write_bytes(b"x")
@@ -100,7 +104,7 @@ def test_library_sync_updates_reversed_metadata_from_filename(db_session, tmp_pa
     assert updated.title == "Wonderwall"
 
 
-def test_library_sync_marks_missing_files_failed(db_session, tmp_path: Path) -> None:
+def test_library_sync_marks_missing_files_failed(db_session: Session, tmp_path: Path) -> None:
     _set_folders(db_session, tmp_path)
     track = Track(
         source_path=str(tmp_path / "watch" / "gone.mp3"),

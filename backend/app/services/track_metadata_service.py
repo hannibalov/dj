@@ -1,5 +1,6 @@
 """Manual artist/title overrides written to file tags and the database."""
 
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -14,16 +15,23 @@ from app.metadata.tags import write_tags
 from app.models.enums import TrackStatus
 from app.models.fingerprint import Fingerprint
 from app.models.track import Track
-from app.utils.audio_format import get_format_info
 from app.services.fingerprint_service import FingerprintService
 from app.services.notify import notify_pipeline_changed
 from app.services.settings_service import SettingsService
+from app.utils.audio_format import get_format_info
 
 logger = get_logger("TAGGER")
 
 
 class TrackMetadataError(Exception):
     pass
+
+
+@dataclass(frozen=True)
+class RenameArtistResult:
+    status: str
+    matched: int
+    updated: int
 
 
 class TrackMetadataService:
@@ -139,6 +147,74 @@ class TrackMetadataService:
         )
         return track
 
+    def swap_artist_title(self, track_id: int) -> Track:
+        """Swap the artist and title fields on a track (fixes reversed metadata)."""
+        track = self._db.get(Track, track_id)
+        if track is None:
+            raise TrackMetadataError(f"Track not found: {track_id}")
+        if not track.artist or not track.title:
+            raise TrackMetadataError("Track is missing artist or title")
+
+        updated = self.update_metadata(
+            track_id,
+            artist=track.title,
+            title=track.artist,
+            genre=track.genre,
+            subgenre=track.subgenre,
+        )
+        updated.metadata_issue = None
+        self._db.commit()
+        self._db.refresh(updated)
+        return updated
+
+    def rename_artist_everywhere(self, old_artist: str, new_artist: str) -> RenameArtistResult:
+        """Rename every track credited to old_artist (case-insensitive exact match)."""
+        old_artist = old_artist.strip()
+        new_artist = new_artist.strip()
+        if not old_artist or not new_artist:
+            raise TrackMetadataError("Both old and new artist names are required")
+
+        old_fold = old_artist.casefold()
+        candidates = (
+            self._db.execute(select(Track).where(Track.artist.isnot(None), Track.artist != ""))
+            .scalars()
+            .all()
+        )
+        matched_tracks = [
+            track for track in candidates if track.artist and track.artist.casefold() == old_fold
+        ]
+
+        updated = 0
+        for track in matched_tracks:
+            if not track.title:
+                logger.warning(
+                    "rename_artist_everywhere_track_failed",
+                    track_id=track.id,
+                    old_artist=old_artist,
+                    new_artist=new_artist,
+                    error="Track is missing a title",
+                )
+                continue
+            try:
+                self.update_metadata(
+                    track.id,
+                    artist=new_artist,
+                    title=track.title,
+                    genre=track.genre,
+                    subgenre=track.subgenre,
+                )
+                updated += 1
+            except TrackMetadataError as exc:
+                logger.warning(
+                    "rename_artist_everywhere_track_failed",
+                    track_id=track.id,
+                    old_artist=old_artist,
+                    new_artist=new_artist,
+                    error=str(exc),
+                )
+
+        return RenameArtistResult(status="ok", matched=len(matched_tracks), updated=updated)
+
     def _route_on_fingerprint_collision(
         self,
         track: Track,
@@ -219,7 +295,6 @@ class TrackMetadataService:
             return True
         return False
 
-
     def _resolve_genres_after_edit(self, track: Track, audio_path: Path) -> None:
         """Re-fetch genre/subgenre from MusicBrainz after manual artist/title correction."""
         if track.genre and track.subgenre:
@@ -261,9 +336,7 @@ class TrackMetadataService:
 
         groups = SongDuplicateService(self._db).list_groups()
         if groups:
-            notify_pipeline_changed(
-                f"Same-song review: {len(groups)} group(s) need comparison"
-            )
+            notify_pipeline_changed(f"Same-song review: {len(groups)} group(s) need comparison")
 
 
 def _normalize_genre_field(value: str | None) -> str | None:
@@ -290,9 +363,7 @@ def _find_track_owning_path(db: Session, path: Path) -> Track | None:
         return None
     resolved = path.resolve()
     candidates = db.execute(
-        select(Track).where(
-            or_(Track.final_path.isnot(None), Track.processing_path.isnot(None))
-        )
+        select(Track).where(or_(Track.final_path.isnot(None), Track.processing_path.isnot(None)))
     ).scalars()
     for track in candidates:
         for path_str in (track.final_path, track.processing_path):

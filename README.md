@@ -4,7 +4,7 @@ Self-hosted DJ library ingestion for **Raspberry Pi 4** and Docker. Watches a sy
 
 | Document | Purpose |
 |----------|---------|
-| [dj-library-pipeline-spec.md](./dj-library-pipeline-spec.md) | Full product specification |
+| [dj-library-pipeline-spec.md](./docs/dj-library-pipeline-spec.md) | Full product specification |
 | [docs/ROADMAP.md](./docs/ROADMAP.md) | Phased roadmap |
 | [docs/PHASE6.md](./docs/PHASE6.md) | **Next:** Docker on Pi — deployment plan |
 | [docs/PHASE1.md](./docs/PHASE1.md) – [PHASE5.md](./docs/PHASE5.md) | Completed phase notes |
@@ -74,7 +74,6 @@ Then use dashboard **Reanalyze all** if you need to refresh loudness, BPM/key, t
 |------|-------------|--------------|
 | **[deploy/docker-compose.yml](./deploy/docker-compose.yml)** | **Raspberry Pi / production** | Pulls pre-built images from Docker Hub (`DOCKER_USER/dj-pipeline-*`). No repo clone on the Pi — copy or `curl` this file only. |
 | **[docker-compose.yml](./docker-compose.yml)** (repo root) | **Developers** | Builds images from source (`docker compose up -d --build`) with the full repo checked out. |
-| **[docker-compose.pull.yml](./docker-compose.pull.yml)** | *Legacy — do not use* | Older pull-only file with full image URLs (`DJ_BACKEND_IMAGE` / `DJ_FRONTEND_IMAGE`). Superseded by `deploy/docker-compose.yml` + `DOCKER_USER`. |
 
 You only need **one** compose file on a given machine. The Pi uses **`deploy/docker-compose.yml`**; local hacking uses the **root** file.
 
@@ -91,7 +90,7 @@ For hacking on the codebase without Docker.
 ### 1. Install
 
 ```bash
-chmod +x install.sh && ./install.sh
+chmod +x scripts/install.sh && ./scripts/install.sh
 cd /path/to/dj && set -a && source .env && set +a
 ```
 

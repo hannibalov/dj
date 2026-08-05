@@ -16,6 +16,7 @@ function track(overrides: Partial<Track> = {}): Track {
     album: null,
     genre: null,
     subgenre: null,
+    metadata_issue: null,
     mix_version: null,
     tag_confidence: null,
     needs_metadata_review: false,

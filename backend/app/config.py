@@ -85,6 +85,10 @@ class Settings(BaseSettings):
         default="camelot",
         description="Track key display: camelot (8A) or traditional (A minor)",
     )
+    metadata_sanity_interval_minutes: float = Field(
+        default=60.0,
+        description="Minutes between automatic metadata sanity checks",
+    )
 
 
 @lru_cache

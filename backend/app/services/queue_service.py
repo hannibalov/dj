@@ -314,11 +314,7 @@ class QueueService:
         return self._count(JobStatus.PENDING)
 
     def clear_failed_jobs(self) -> int:
-        jobs = (
-            self._db.execute(select(Job).where(Job.status == JobStatus.FAILED))
-            .scalars()
-            .all()
-        )
+        jobs = self._db.execute(select(Job).where(Job.status == JobStatus.FAILED)).scalars().all()
         for job in jobs:
             self._db.delete(job)
         if jobs:
@@ -444,11 +440,7 @@ class QueueService:
 
     def reset_interrupted_jobs(self) -> int:
         """Return RUNNING jobs to PENDING (e.g. after worker crash or container restart)."""
-        jobs = (
-            self._db.execute(select(Job).where(Job.status == JobStatus.RUNNING))
-            .scalars()
-            .all()
-        )
+        jobs = self._db.execute(select(Job).where(Job.status == JobStatus.RUNNING)).scalars().all()
         for job in jobs:
             job.status = JobStatus.PENDING
         if jobs:

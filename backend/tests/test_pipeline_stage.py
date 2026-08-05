@@ -13,7 +13,7 @@ def _track(**kwargs: object) -> Track:
         "status": TrackStatus.INGESTED,
     }
     defaults.update(kwargs)
-    return Track(**defaults)  # type: ignore[arg-type]
+    return Track(**defaults)
 
 
 @pytest.mark.parametrize(

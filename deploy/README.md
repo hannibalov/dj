@@ -15,7 +15,6 @@ You only need the small `deploy/docker-compose.yml` on the Pi so Docker knows ho
 |------|--------|
 | **`deploy/docker-compose.yml`** (this folder) | **Pi / production** — `docker compose pull` using `DOCKER_USER` from `.env` |
 | **`docker-compose.yml`** (repo root) | **Mac / dev** — `docker compose up -d --build` from a git clone |
-| **`docker-compose.pull.yml`** (repo root) | **Deprecated** — old GHCR-style `DJ_BACKEND_IMAGE` variables; use `deploy/` instead |
 
 Do not copy both compose files to the Pi; only **`deploy/docker-compose.yml`**.
 

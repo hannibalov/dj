@@ -37,10 +37,7 @@ def is_youtube_url(url: str) -> bool:
 
 def ffmpeg_postprocessor_args() -> str:
     """ffmpeg transcode flags for yt-dlp — no loudness filters (gain is applied later)."""
-    return (
-        f"-ar {_OUTPUT_SAMPLE_RATE_HZ} "
-        f"-c:a libmp3lame -b:a {_MP3_TARGET_BITRATE.lower()}"
-    )
+    return f"-ar {_OUTPUT_SAMPLE_RATE_HZ} -c:a libmp3lame -b:a {_MP3_TARGET_BITRATE.lower()}"
 
 
 def build_youtube_download_command(url: str, output_dir: Path) -> list[str]:

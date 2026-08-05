@@ -2,7 +2,15 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 import { fetchPipelineStatus } from '@/services/pipelineService'
-import { analyzeBacklog, genreBackfill, librarySync, reanalyzeAll, rescanQueue } from '@/services/queueService'
+import {
+  analyzeBacklog,
+  genreBackfill,
+  librarySync,
+  type MetadataSanityResponse,
+  metadataSanityCheck,
+  reanalyzeAll,
+  rescanQueue,
+} from '@/services/queueService'
 import type { PipelineSnapshot } from '@/types/pipeline'
 
 import { useSnackbarStore } from './snackbarStore'
@@ -11,6 +19,8 @@ export const usePipelineStore = defineStore('pipeline', () => {
   const snapshot = ref<PipelineSnapshot | null>(null)
   const loading = ref(false)
   const wsConnected = ref(false)
+  const sanityCheckLoading = ref(false)
+  const lastSanityResult = ref<MetadataSanityResponse | null>(null)
 
   const snackbar = useSnackbarStore()
 
@@ -125,10 +135,33 @@ export const usePipelineStore = defineStore('pipeline', () => {
     }
   }
 
+  async function runMetadataSanityCheck(): Promise<void> {
+    sanityCheckLoading.value = true
+    try {
+      const result = await metadataSanityCheck()
+      lastSanityResult.value = result
+      snackbar.show(
+        `Metadata sanity check: scanned ${result.scanned}, ` +
+          `${result.flagged_possible_swap} possible swaps, ` +
+          `${result.flagged_artist_in_title} artist-in-title flags.`,
+        { color: result.anomaly ? 'warning' : 'success' },
+      )
+      await load()
+    } catch (e) {
+      snackbar.show(e instanceof Error ? e.message : 'Metadata sanity check failed', {
+        color: 'error',
+      })
+    } finally {
+      sanityCheckLoading.value = false
+    }
+  }
+
   return {
     snapshot,
     loading,
     wsConnected,
+    sanityCheckLoading,
+    lastSanityResult,
     queue,
     tracks,
     workerActive,
@@ -142,6 +175,7 @@ export const usePipelineStore = defineStore('pipeline', () => {
     runReanalyzeAll,
     runGenreBackfill,
     runLibrarySync,
+    runMetadataSanityCheck,
     applySnapshot,
   }
 })

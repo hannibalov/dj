@@ -4,7 +4,6 @@ from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.enums import TrackStatus
 from app.models.track import Track
 from app.schemas.track import TrackResponse
 from app.schemas.track_summary import TrackStatusSummary
@@ -35,9 +34,7 @@ class TrackService:
         return [self._to_response(r) for r in rows]
 
     def status_summary(self) -> TrackStatusSummary:
-        rows = self._db.execute(
-            select(Track.status, func.count()).group_by(Track.status)
-        ).all()
+        rows = self._db.execute(select(Track.status, func.count()).group_by(Track.status)).all()
         by_status = {status.value: count for status, count in rows}
         total = sum(by_status.values())
 

@@ -1,18 +1,19 @@
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.metadata.musicbrainz_lookup import RecordingGenreInfo
 from app.metadata.matcher import MetadataMatch
+from app.metadata.musicbrainz_lookup import RecordingGenreInfo
 from app.models.enums import JobStatus, JobType, TrackStatus
 from app.models.job import Job
 from app.models.track import Track
 from app.services.tag_service import TagService
 
 
-def _mock_genres(genre: str | None = "Electronic", subgenre: str | None = "Techno"):
+def _mock_genres(genre: str | None = "Electronic", subgenre: str | None = "Techno") -> Any:
     return patch(
         "app.services.tag_service.resolve_track_genres",
         return_value=RecordingGenreInfo(genre=genre, subgenre=subgenre),

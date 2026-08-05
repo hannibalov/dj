@@ -1,6 +1,6 @@
 # Implementation roadmap
 
-Phased delivery aligned with [dj-library-pipeline-spec.md](../dj-library-pipeline-spec.md).
+Phased delivery aligned with [dj-library-pipeline-spec.md](./dj-library-pipeline-spec.md).
 
 | Phase | Doc | Status | Summary |
 |-------|-----|--------|---------|
@@ -53,7 +53,7 @@ The API exposes `pipeline_stage` on each track and `by_pipeline_stage` in `track
 
 ## System dependencies
 
-| Tool | Phase | `install.sh` | Docker image |
+| Tool | Phase | `scripts/install.sh` | Docker image |
 |------|-------|----------------|--------------|
 | ffmpeg | 2 | Manual | Yes |
 | fpcalc (Chromaprint) | 3 | Manual | Yes (`libchromaprint-tools`) |
@@ -63,7 +63,7 @@ The API exposes `pipeline_stage` on each track and `by_pipeline_stage` in `track
 | httpx (MusicBrainz search + genres) | 4 | pip (`backend`) | Yes |
 | AcoustID API key | 4 | `.env` | `.env` / compose |
 
-`install.sh` / `install.py` set up Python, Node, folders, SQLite, and `.env` only.
+`scripts/install.sh` / `scripts/install.py` set up Python, Node, folders, SQLite, and `.env` only.
 
 ---
 
