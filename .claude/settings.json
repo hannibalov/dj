@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/opt/homebrew/bin/python3.14 -m venv .venv_new)",
+      "Bash(.venv_new/bin/python3 --version)",
+      "Bash(/opt/homebrew/opt/python@3.14/bin/python3.14 --version)",
+      "Bash(npm test *)",
+      "Bash(timeout 15 make install)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(.venv_new/bin/pip install *)",
+      "Read(//Users/**)",
+      "Bash(find / -maxdepth 3 -iname \"*pyenv*\")",
+      "Bash(rm -rf .venv)",
+      "Bash(/opt/homebrew/opt/python@3.14/bin/python3.14 -m venv .venv)",
+      "Bash(.venv/bin/pip install *)",
+      "Bash(node node_modules/esbuild/install.js)",
+      "Bash(node node_modules/vitest/node_modules/esbuild/install.js)",
+      "Bash(node_modules/esbuild/bin/esbuild --version)",
+      "Bash(.venv_new/bin/python -m pytest -q)",
+      "Bash(git -C /Users/rodrigo.pizarro/Documents/personal/dj status --porcelain data backend)",
+      "Bash(.venv/bin/python --version)",
+      "Bash(npm config *)",
+      "Bash(npm --version)",
+      "Read(//Users/rodrigo.pizarro/**)",
+      "Bash(npm approve-scripts *)",
+      "Bash(npm rebuild *)",
+      "Bash(.venv/bin/ruff check *)",
+      "Bash(xattr -l node_modules/@esbuild/darwin-arm64/bin/esbuild)",
+      "Bash(.venv/bin/pip list *)",
+      "Bash(git fetch *)",
+      "Bash(saml2aws list-roles *)",
+      "Bash(export AWS_PROFILE=*)",
+      "mcp__claude_ai_Atlassian_Rovo__getJiraIssue",
+      "mcp__844e5429-f72c-42f1-b63a-9dc06b594cdd__validate_monitor_definition",
+      "mcp__claude_ai_Datadog__search_datadog_monitors",
+      "mcp__claude_ai_Datadog__search_datadog_events",
+      "mcp__claude_ai_Datadog__analyze_datadog_logs",
+      "mcp__claude_ai_Atlassian_Rovo__getConfluencePage",
+      "mcp__claude_ai_Datadog__list_datadog_skills",
+      "mcp__claude_ai_Datadog__load_datadog_skill"
+    ]
+  }
+}
