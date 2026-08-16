@@ -3,6 +3,10 @@
 import shutil
 from pathlib import Path
 
+from app.logging import get_logger
+
+logger = get_logger("WORKSPACE")
+
 
 def move_into_destination(source: Path, dest: Path) -> Path:
     """
@@ -13,10 +17,41 @@ def move_into_destination(source: Path, dest: Path) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     if dest.exists():
         if source.resolve() == dest.resolve():
+            logger.debug("move_noop_same_path", source=str(source), dest=str(dest))
             return dest
+        logger.error("move_dest_exists", source=str(source), dest=str(dest))
         raise FileExistsError(dest)
-    shutil.move(str(source), str(dest))
-    return dest
+
+    logger.debug("move_into_destination_start", source=str(source), dest=str(dest))
+    try:
+        shutil.move(str(source), str(dest))
+        logger.info("move_into_destination_complete", source=str(source), dest=str(dest))
+        return dest
+    except Exception as exc:  # fallback for surprising cross-device errors
+        logger.warning(
+            "move_into_destination_failed_try_copy",
+            source=str(source),
+            dest=str(dest),
+            error=str(exc),
+        )
+        # Try copy + unlink as a safe fallback
+        try:
+            shutil.copy2(str(source), str(dest))
+            try:
+                if Path(source).is_file():
+                    Path(source).unlink()
+            except Exception:
+                logger.warning("move_fallback_unlink_failed", source=str(source))
+            logger.info("move_into_destination_fallback_complete", source=str(source), dest=str(dest))
+            return dest
+        except Exception as exc2:
+            logger.error(
+                "move_into_destination_failed",
+                source=str(source),
+                dest=str(dest),
+                error=str(exc2),
+            )
+            raise
 
 
 def path_is_under_root(path: Path, root: Path) -> bool:

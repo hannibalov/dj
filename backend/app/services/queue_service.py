@@ -447,6 +447,19 @@ class QueueService:
             self._db.commit()
         return len(jobs)
 
+    def retry_job(self, job_id: int) -> bool:
+        """Requeue a FAILED job by setting it back to PENDING and clearing error state."""
+        job = self._db.get(Job, job_id)
+        if job is None:
+            return False
+        if job.status != JobStatus.FAILED:
+            return False
+        job.status = JobStatus.PENDING
+        job.error_message = None
+        job.attempts = 0
+        self._db.commit()
+        return True
+
     def claim_next_pending(self) -> Job | None:
         job = (
             self._db.execute(

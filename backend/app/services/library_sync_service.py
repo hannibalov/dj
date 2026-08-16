@@ -259,3 +259,21 @@ class LibrarySyncService:
             if path.is_file():
                 return path
         return None
+
+    def cleanup_missing_tracks(self) -> int:
+        """Delete tracks from the database that no longer have any existing audio file.
+
+        Returns the number of deleted track rows.
+        """
+        tracks = self._db.execute(select(Track)).scalars().all()
+        deleted = 0
+        for track in tracks:
+            if not self._track_has_file(track):
+                try:
+                    self._db.delete(track)
+                    deleted += 1
+                except Exception:
+                    # best-effort: continue on errors
+                    continue
+        self._db.commit()
+        return deleted

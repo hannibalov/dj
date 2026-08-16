@@ -3,6 +3,7 @@
 import re
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 from app.download.linear_gain import LinearGainError, apply_linear_gain
@@ -72,9 +73,12 @@ def build_youtube_download_command(url: str, output_dir: Path) -> list[str]:
     ]
 
     if shutil.which("node"):
-        cmd[1:1] = ["--js-runtimes", "node"]
+        # Enable Node.js runtime and allow fetching yt-dlp EJS remote components
+        # (needed for signature/challenge solvers on some YouTube pages).
+        cmd[1:1] = ["--js-runtimes", "node", "--remote-components", "ejs:github"]
     elif shutil.which("deno"):
-        cmd[1:1] = ["--js-runtimes", "deno"]
+        # Deno support may also require remote components to be allowed.
+        cmd[1:1] = ["--js-runtimes", "deno", "--remote-components", "ejs:github"]
 
     return cmd
 
@@ -96,24 +100,65 @@ def download_youtube_audio(
         raise YouTubeDownloadError("yt-dlp not found on PATH")
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    cmd = build_youtube_download_command(url, output_dir)
+    base_cmd = build_youtube_download_command(url, output_dir)
 
-    try:
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout_seconds,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise YouTubeDownloadError(f"yt-dlp failed: {exc}") from exc
+    def _run(cmd: list[str]) -> subprocess.CompletedProcess:
+        try:
+            return subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise YouTubeDownloadError(f"yt-dlp failed: {exc}") from exc
 
-    if proc.returncode != 0:
+    # Attempt sequence: original → UA/Referer/geo-bypass → combined EJS+UA
+    attempts = []
+    # 0: original
+    attempts.append((base_cmd, "original"))
+
+    # 1: UA + Referer + geo-bypass
+    ua = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/115.0 Safari/537.36"
+    )
+    attempts.append((base_cmd + ["--user-agent", ua, "--add-header", "Referer: https://www.youtube.com/", "--geo-bypass"], "ua_referer"))
+
+    # 2: combined - ensure remote components are allowed and include UA/Referer
+    combined_cmd = list(base_cmd)
+    # If Node/Deno present, add explicit runtimes + remote components
+    if shutil.which("node"):
+        combined_cmd[1:1] = ["--js-runtimes", "node", "--remote-components", "ejs:github"]
+    elif shutil.which("deno"):
+        combined_cmd[1:1] = ["--js-runtimes", "deno", "--remote-components", "ejs:github"]
+    else:
+        # Add remote-components hint even if runtime not detected — yt-dlp will skip if unavailable.
+        combined_cmd[1:1] = ["--remote-components", "ejs:github,ejs:npm"]
+
+    combined_cmd += ["--user-agent", ua, "--add-header", "Referer: https://www.youtube.com/", "--geo-bypass"]
+    attempts.append((combined_cmd, "combined_ejs_ua"))
+
+    last_detail = None
+    proc = None
+    for idx, (cmd, label) in enumerate(attempts, start=1):
+        logger.info("youtube_download_attempt", url=url, attempt=idx, label=label)
+        proc = _run(cmd)
+        if proc.returncode == 0:
+            break
+
         stderr = (proc.stderr or "").strip()
         stdout = (proc.stdout or "").strip()
-        detail = stderr or stdout or f"exit code {proc.returncode}"
-        raise YouTubeDownloadError(detail)
+        last_detail = stderr or stdout or f"exit code {proc.returncode}"
+
+        # Quick backoff between attempts
+        if idx < len(attempts):
+            time.sleep(1)
+
+    if proc is None or proc.returncode != 0:
+        # Surface best available output for diagnostics
+        raise YouTubeDownloadError(last_detail or "yt-dlp failed")
 
     lines = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
     if not lines:

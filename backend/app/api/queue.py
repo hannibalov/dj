@@ -9,6 +9,7 @@ from app.schemas.queue import (
     GenreBackfillResponse,
     LibrarySyncResponse,
     MetadataSanityResponse,
+    CleanupResponse,
     QueueResponse,
     RescanResponse,
 )
@@ -130,3 +131,20 @@ async def metadata_sanity_check(db: Session = Depends(get_db)) -> MetadataSanity
         artist_in_title_ratio=result.artist_in_title_ratio,
         anomaly=result.anomaly,
     )
+
+
+@router.post("/library-cleanup", response_model=CleanupResponse)
+async def library_cleanup(db: Session = Depends(get_db)) -> CleanupResponse:
+    deleted = LibrarySyncService(db).cleanup_missing_tracks()
+    message = f"Removed {deleted} missing track(s) from the library" if deleted else "No missing tracks found"
+    await broadcast_snapshot(message)
+    return CleanupResponse(status="ok", deleted=deleted, message=message)
+
+
+@router.post("/retry-job/{job_id}")
+async def retry_job(job_id: int, db: Session = Depends(get_db)) -> dict:
+    service = QueueService(db)
+    ok = service.retry_job(job_id)
+    message = f"Requeued job {job_id}" if ok else f"Could not requeue job {job_id}"
+    await broadcast_snapshot(message)
+    return {"status": "ok" if ok else "error", "requeued": ok, "message": message}

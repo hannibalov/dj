@@ -31,6 +31,16 @@ export function librarySync(): Promise<LibrarySyncResult> {
   return api.post<LibrarySyncResult>('/queue/library-sync')
 }
 
+export interface LibraryCleanupResult {
+  status: string
+  deleted: number
+  message: string
+}
+
+export function libraryCleanup(): Promise<LibraryCleanupResult> {
+  return api.post<LibraryCleanupResult>('/queue/library-cleanup')
+}
+
 export function unstickQueue(): Promise<AnalyzeBacklogResult> {
   return api.post<AnalyzeBacklogResult>('/queue/unstick')
 }
@@ -43,6 +53,10 @@ export interface ClearFailedJobsResult {
 
 export function clearFailedJobs(): Promise<ClearFailedJobsResult> {
   return api.post<ClearFailedJobsResult>('/queue/clear-failed-jobs')
+}
+
+export function retryJob(jobId: number): Promise<{ status: string; requeued: boolean; message?: string }> {
+  return api.post(`/queue/retry-job/${jobId}`)
 }
 
 export interface MetadataSanityResponse {

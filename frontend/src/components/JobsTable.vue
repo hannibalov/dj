@@ -31,6 +31,17 @@
         <template #[`item.error_message`]="{ item }">
           <span class="text-caption text-error">{{ item.error_message ?? '—' }}</span>
         </template>
+        <template #[`item.action`]="{ item }">
+          <v-btn
+            v-if="item.status === 'failed'"
+            size="small"
+            variant="outlined"
+            prepend-icon="mdi-replay"
+            @click="onRetry(item)"
+          >
+            Retry
+          </v-btn>
+        </template>
       </v-data-table>
     </v-card-text>
   </v-card>
@@ -39,6 +50,9 @@
 <script setup lang="ts">
 import type { Job } from '@/types/queue'
 import { jobSourceLabel, jobStatusColor, jobStatusLabel, jobTypeLabel } from '@/utils/labels'
+import { useSnackbarStore } from '@/stores/snackbarStore'
+import { usePipelineStore } from '@/stores/pipelineStore'
+import { retryJob } from '@/services/queueService'
 
 defineProps<{
   jobs: Job[]
@@ -50,5 +64,20 @@ const headers = [
   { title: 'Type', key: 'job_type' },
   { title: 'Status', key: 'status' },
   { title: 'Error', key: 'error_message' },
+  { title: 'Action', key: 'action' },
 ]
+
+const snackbar = useSnackbarStore()
+const pipeline = usePipelineStore()
+
+async function onRetry(item: Job) {
+  try {
+    const result = await retryJob(item.id)
+    snackbar.show(result.message ?? (result.requeued ? 'Requeued' : 'Retry failed'), { color: result.requeued ? 'success' : 'error' })
+    // Refresh pipeline status
+    await pipeline.load()
+  } catch (e) {
+    snackbar.show(e instanceof Error ? e.message : 'Retry failed', { color: 'error' })
+  }
+}
 </script>

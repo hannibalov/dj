@@ -60,6 +60,12 @@ class ClearFailedJobsResponse(BaseModel):
     message: str
 
 
+class CleanupResponse(BaseModel):
+    status: str
+    deleted: int
+    message: str
+
+
 class MetadataSanityResponse(BaseModel):
     status: str
     scanned: int

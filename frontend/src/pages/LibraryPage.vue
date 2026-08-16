@@ -57,6 +57,14 @@
         >
           Rename artist everywhere
         </v-btn>
+        <v-btn
+          size="small"
+          variant="tonal"
+          @click="onCleanup()"
+          :loading="cleanupRunning"
+        >
+          Cleanup missing tracks
+        </v-btn>
       </v-card-title>
       <v-card-text>
         <div class="d-flex align-center flex-wrap ga-4 mb-4">
@@ -146,6 +154,7 @@ const renameDialogOpen = ref(false)
 const oldArtist = ref('')
 const newArtist = ref('')
 const renaming = ref(false)
+const cleanupRunning = ref(false)
 
 const filteredTracks = computed(() =>
   filterLibraryTracks(pipeline.tracks, {
@@ -189,4 +198,16 @@ onMounted(() => {
     void pipeline.runMetadataSanityCheck()
   }
 })
+
+async function onCleanup(): Promise<void> {
+  if (!confirm('Remove library rows for tracks whose files are missing? This cannot be undone.')) {
+    return
+  }
+  cleanupRunning.value = true
+  try {
+    await pipeline.runLibraryCleanup()
+  } finally {
+    cleanupRunning.value = false
+  }
+}
 </script>

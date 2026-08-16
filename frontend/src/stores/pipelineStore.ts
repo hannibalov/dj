@@ -6,6 +6,7 @@ import {
   analyzeBacklog,
   genreBackfill,
   librarySync,
+  libraryCleanup,
   type MetadataSanityResponse,
   metadataSanityCheck,
   reanalyzeAll,
@@ -135,6 +136,19 @@ export const usePipelineStore = defineStore('pipeline', () => {
     }
   }
 
+  async function runLibraryCleanup(): Promise<void> {
+    loading.value = true
+    try {
+      const result = await libraryCleanup()
+      snackbar.show(result.message ?? `Removed ${result.deleted} missing tracks`, { color: 'success' })
+      await load()
+    } catch (e) {
+      snackbar.show(e instanceof Error ? e.message : 'Library cleanup failed', { color: 'error' })
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function runMetadataSanityCheck(): Promise<void> {
     sanityCheckLoading.value = true
     try {
@@ -175,6 +189,7 @@ export const usePipelineStore = defineStore('pipeline', () => {
     runReanalyzeAll,
     runGenreBackfill,
     runLibrarySync,
+    runLibraryCleanup,
     runMetadataSanityCheck,
     applySnapshot,
   }
